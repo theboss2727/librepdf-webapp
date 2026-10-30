@@ -407,8 +407,12 @@ export async function renderPageToImage(
   format: 'png' | 'jpeg' = 'png',
   quality: number = 0.92
 ): Promise<{ dataUrl: string; width: number; height: number; blob: Blob }> {
+  // Make a defensive copy to prevent Web Worker buffer detachment
+  const safeCopy = new Uint8Array(
+    pdfData instanceof Uint8Array ? pdfData.slice() : pdfData.slice(0)
+  );
   const loadingTask = pdfjsLib.getDocument({
-    data: new Uint8Array(pdfData),
+    data: safeCopy,
   });
   const pdf = await loadingTask.promise;
   const page = await pdf.getPage(pageNumber);
@@ -440,6 +444,57 @@ export async function renderPageToImage(
     height: viewport.height,
     blob,
   };
+}
+
+/**
+ * Render all page thumbnails in high performance by opening the PDF document once
+ * and progressively streaming thumbnails as they are drawn.
+ */
+export async function renderAllThumbnails(
+  fileOrBuffer: File | ArrayBuffer | Uint8Array,
+  onPageRendered?: (pageIndex: number, dataUrl: string, total: number) => void,
+  maxPages: number = 100,
+  scale: number = 0.45
+): Promise<{ totalPages: number; thumbnails: Map<number, string> }> {
+  let safeBytes: Uint8Array;
+  if (fileOrBuffer instanceof File) {
+    const ab = await fileOrBuffer.arrayBuffer();
+    safeBytes = new Uint8Array(ab);
+  } else if (fileOrBuffer instanceof Uint8Array) {
+    safeBytes = fileOrBuffer.slice();
+  } else {
+    safeBytes = new Uint8Array(fileOrBuffer.slice(0));
+  }
+
+  const loadingTask = pdfjsLib.getDocument({ data: safeBytes });
+  const pdf = await loadingTask.promise;
+  const totalPages = pdf.numPages;
+  const thumbnails = new Map<number, string>();
+
+  const limit = Math.min(totalPages, maxPages);
+  for (let i = 1; i <= limit; i++) {
+    try {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await page.render({ canvasContext: ctx, viewport } as any).promise;
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        thumbnails.set(i - 1, dataUrl);
+        onPageRendered?.(i - 1, dataUrl, totalPages);
+      }
+    } catch (e) {
+      console.warn(`Errore rendering miniatura pagina ${i}:`, e);
+    }
+  }
+
+  return { totalPages, thumbnails };
 }
 
 /** Extract text from PDF document */

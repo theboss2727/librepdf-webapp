@@ -10,10 +10,12 @@ import {
   CheckCircle2,
   Loader2,
   FileText,
+  GripVertical,
+  MousePointerClick,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
-import { organizePdfPages, renderPageToImage, type PageConfig } from '../../services/pdfEngine';
+import { organizePdfPages, renderAllThumbnails, type PageConfig } from '../../services/pdfEngine';
 import { saveToVault } from '../../services/storageVault';
 
 interface OrganizeItem {
@@ -34,6 +36,8 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const fileItem = files[0];
 
@@ -46,25 +50,48 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
     const initPages = async () => {
       setLoadingThumbnails(true);
       try {
-        const count = fileItem.pageCount || 1;
-        const initialList: OrganizeItem[] = Array.from({ length: count }, (_, i) => ({
-          id: `page_${i}_${Date.now()}_${Math.random()}`,
-          originalIndex: i,
-          rotation: 0,
-        }));
-        setPages(initialList);
+        const initialCount = fileItem.pageCount || 1;
+        setPages(
+          Array.from({ length: initialCount }, (_, i) => ({
+            id: `page_${i}_${Date.now()}_${Math.random()}`,
+            originalIndex: i,
+            rotation: 0,
+          }))
+        );
 
         const buffer = await fileItem.file.arrayBuffer();
-        for (let i = 0; i < Math.min(count, 30); i++) {
-          try {
-            const { dataUrl } = await renderPageToImage(buffer, i + 1, 0.4);
-            setPages((prev) =>
-              prev.map((p) => (p.originalIndex === i ? { ...p, thumbnailUrl: dataUrl } : p))
-            );
-          } catch {
-            // thumbnail fallback
-          }
-        }
+
+        // Open PDF once and stream thumbnails for all pages in real time
+        await renderAllThumbnails(
+          buffer,
+          (pageIdx, dataUrl, total) => {
+            setPages((prev) => {
+              // Expand list if document actually has more pages than initial guess
+              if (prev.length < total) {
+                const fullList: OrganizeItem[] = Array.from({ length: total }, (_, i) => {
+                  const existing = prev.find((p) => p.originalIndex === i);
+                  return (
+                    existing || {
+                      id: `page_${i}_${Date.now()}_${Math.random()}`,
+                      originalIndex: i,
+                      rotation: 0,
+                    }
+                  );
+                });
+                return fullList.map((p) =>
+                  p.originalIndex === pageIdx ? { ...p, thumbnailUrl: dataUrl } : p
+                );
+              }
+              return prev.map((p) =>
+                p.originalIndex === pageIdx ? { ...p, thumbnailUrl: dataUrl } : p
+              );
+            });
+          },
+          100,
+          0.45
+        );
+      } catch (err) {
+        console.error('Errore generazione miniature tavolo di montaggio:', err);
       } finally {
         setLoadingThumbnails(false);
       }
@@ -105,6 +132,46 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
     const [moved] = reordered.splice(index, 1);
     reordered.splice(newIndex, 0, moved);
     setPages(reordered);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', String(index));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = (index: number) => {
+    if (dragOverIndex === index) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleDropCard = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const reordered = [...pages];
+    const [moved] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    setPages(reordered);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   const handleSaveOrganized = async () => {
@@ -250,93 +317,127 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
                 </div>
               )}
 
+              {/* Drag and Drop Helper Banner */}
+              <div className="flex items-center gap-2 p-2.5 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 rounded-xl text-xs text-blue-800 dark:text-blue-300">
+                <MousePointerClick className="w-4 h-4 text-blue-500 shrink-0" />
+                <span>
+                  <b>Trascina le pagine col mouse</b>: afferra qualsiasi miniatura e rilasciala nella posizione desiderata per riordinare la sequenza al volo.
+                </span>
+              </div>
+
               {/* Grid of Pages */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {pages.map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className="relative flex flex-col items-center bg-white dark:bg-zinc-900 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-xs transition group"
-                  >
-                    {/* Page sequence index badge */}
-                    <span className="absolute top-2 left-2 z-10 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-xs">
-                      #{idx + 1}
-                    </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                {pages.map((p, idx) => {
+                  const isBeingDragged = draggedIndex === idx;
+                  const isTarget = dragOverIndex === idx && draggedIndex !== idx;
 
-                    {/* Rotation badge if rotated */}
-                    {p.rotation !== 0 && (
-                      <span className="absolute top-2 right-2 z-10 font-mono text-[9px] font-bold px-1 py-0.5 rounded bg-rose-500 text-white shadow-xs">
-                        {p.rotation}°
+                  return (
+                    <div
+                      key={p.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={(e) => handleDragOver(e, idx)}
+                      onDragLeave={() => handleDragLeave(idx)}
+                      onDrop={(e) => handleDropCard(e, idx)}
+                      onDragEnd={handleDragEnd}
+                      className={`relative flex flex-col items-center bg-white dark:bg-zinc-900 p-2.5 rounded-xl border transition-all duration-150 select-none cursor-grab active:cursor-grabbing group ${
+                        isBeingDragged
+                          ? 'opacity-30 scale-95 border-dashed border-blue-500 bg-blue-50/20 dark:bg-blue-950/20 shadow-none'
+                          : isTarget
+                          ? 'border-blue-500 ring-2 ring-blue-500/60 scale-102 bg-blue-50/70 dark:bg-blue-950/40 shadow-lg'
+                          : 'border-zinc-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-xs'
+                      }`}
+                      title="Trascina con il mouse per spostare questa pagina nella nuova posizione"
+                    >
+                      {/* Page sequence index badge */}
+                      <span className="absolute top-2 left-2 z-10 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-xs pointer-events-none">
+                        #{idx + 1}
                       </span>
-                    )}
 
-                    {/* Thumbnail Container */}
-                    <div className="w-full aspect-3/4 bg-zinc-50 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden flex items-center justify-center relative mb-2">
-                      {p.thumbnailUrl ? (
-                        <img
-                          src={p.thumbnailUrl}
-                          alt={`Pagina ${idx + 1}`}
-                          style={{
-                            transform: `rotate(${p.rotation}deg)`,
-                            transition: 'transform 0.2s ease',
-                          }}
-                          className="w-full h-full object-contain p-1"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-zinc-400">
-                          <FileText className="w-6 h-6 mb-1 opacity-40" />
-                          <span className="text-[10px] font-mono text-zinc-500">
-                            P.{p.originalIndex + 1}
-                          </span>
-                        </div>
+                      {/* Drag Grip Handle in top-center */}
+                      <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 opacity-30 group-hover:opacity-100 transition text-zinc-500 group-hover:text-blue-500 flex items-center justify-center p-1 pointer-events-none">
+                        <GripVertical className="w-3.5 h-3.5" />
+                      </div>
+
+                      {/* Rotation badge if rotated */}
+                      {p.rotation !== 0 && (
+                        <span className="absolute top-2 right-2 z-10 font-mono text-[9px] font-bold px-1 py-0.5 rounded bg-rose-500 text-white shadow-xs pointer-events-none">
+                          {p.rotation}°
+                        </span>
                       )}
+
+                      {/* Thumbnail Container */}
+                      <div className="w-full aspect-3/4 bg-zinc-50 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden flex items-center justify-center relative mb-2 pointer-events-none">
+                        {p.thumbnailUrl ? (
+                          <img
+                            src={p.thumbnailUrl}
+                            alt={`Pagina ${idx + 1}`}
+                            style={{
+                              transform: `rotate(${p.rotation}deg)`,
+                              transition: 'transform 0.2s ease',
+                            }}
+                            className="w-full h-full object-contain p-1 pointer-events-none"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-zinc-400 pointer-events-none">
+                            <FileText className="w-6 h-6 mb-1 opacity-40" />
+                            <span className="text-[10px] font-mono text-zinc-500">
+                              P.{p.originalIndex + 1}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Page Action Toolbar */}
+                      <div
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="flex items-center justify-between w-full pt-1.5 border-t border-zinc-100 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400"
+                      >
+                        <button
+                          disabled={idx === 0}
+                          onClick={() => handleMove(idx, 'left')}
+                          className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-20 cursor-pointer"
+                          title="Sposta a sinistra"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleRotatePage(idx)}
+                          className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-blue-500 cursor-pointer"
+                          title="Ruota 90°"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDuplicatePage(idx)}
+                          className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+                          title="Duplica"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeletePage(idx)}
+                          className="p-1 rounded hover:bg-rose-500/10 hover:text-rose-500 cursor-pointer"
+                          title="Elimina"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          disabled={idx === pages.length - 1}
+                          onClick={() => handleMove(idx, 'right')}
+                          className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-20 cursor-pointer"
+                          title="Sposta a destra"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-
-                    {/* Page Action Toolbar */}
-                    <div className="flex items-center justify-between w-full pt-1.5 border-t border-zinc-100 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400">
-                      <button
-                        disabled={idx === 0}
-                        onClick={() => handleMove(idx, 'left')}
-                        className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-20 cursor-pointer"
-                        title="Sposta prima"
-                      >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleRotatePage(idx)}
-                        className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-blue-500 cursor-pointer"
-                        title="Ruota 90°"
-                      >
-                        <RotateCw className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDuplicatePage(idx)}
-                        className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
-                        title="Duplica"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDeletePage(idx)}
-                        className="p-1 rounded hover:bg-rose-500/10 hover:text-rose-500 cursor-pointer"
-                        title="Elimina"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        disabled={idx === pages.length - 1}
-                        onClick={() => handleMove(idx, 'right')}
-                        className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-20 cursor-pointer"
-                        title="Sposta dopo"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="flex justify-end pt-3 border-t border-zinc-200 dark:border-zinc-800">

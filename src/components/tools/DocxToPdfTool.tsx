@@ -1,5 +1,18 @@
 import React, { useState } from 'react';
-import { FileCode, Download, CheckCircle2, Loader2, ArrowRight, Code2, ShieldCheck } from 'lucide-react';
+import {
+  FileCode,
+  Download,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  Code2,
+  ShieldCheck,
+  AlertTriangle,
+  ExternalLink,
+  RefreshCw,
+  Info,
+  HelpCircle,
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { convertDocxToPdf, convertPagesToPdf } from '../../services/officeConverters';
@@ -21,6 +34,11 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
   const [outputName, setOutputName] = useState('');
+  const [errorInfo, setErrorInfo] = useState<{
+    isPagesError?: boolean;
+    fileName?: string;
+    message: string;
+  } | null>(null);
 
   const fileItem = files[0];
 
@@ -29,7 +47,8 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
     const isPages = fileItem.file.name.toLowerCase().endsWith('.pages');
     setIsProcessing(true);
     setProgress(10);
-    setStatusMsg(isPages ? 'Caricamento pacchetto Apple Pages...' : 'Caricamento file Word...');
+    setErrorInfo(null);
+    setStatusMsg(isPages ? 'Analisi pacchetto Apple Pages...' : 'Caricamento file Word...');
 
     try {
       const buffer = await fileItem.file.arrayBuffer();
@@ -63,7 +82,12 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
       onSuccess();
       confetti({ particleCount: 50, spread: 55 });
     } catch (err: any) {
-      alert(`Errore conversione in PDF: ${err.message}`);
+      const isPages = fileItem?.file.name.toLowerCase().endsWith('.pages');
+      setErrorInfo({
+        isPagesError: isPages || err.isPagesNoPreview || err.message?.includes('pages'),
+        fileName: fileItem?.file.name,
+        message: err.message || 'Errore durante la conversione in PDF.',
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -76,6 +100,7 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
     setFiles([]);
     setProgress(0);
     setStatusMsg('');
+    setErrorInfo(null);
   };
 
   return (
@@ -102,7 +127,104 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
         </div>
       </div>
 
-      {downloadUrl ? (
+      {/* ERROR / GUIDANCE CARD */}
+      {errorInfo ? (
+        <div className="p-6 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-300/80 dark:border-amber-800/80 space-y-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-amber-950 dark:text-amber-200">
+                  {errorInfo.isPagesError
+                    ? 'Anteprima PDF non inclusa nel file .pages'
+                    : 'Impossibile completare la conversione'}
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-200/60 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200">
+                  {errorInfo.fileName || 'Documento'}
+                </span>
+              </div>
+              <p className="text-xs text-amber-800/90 dark:text-amber-300/90">
+                {errorInfo.isPagesError
+                  ? 'Questo documento Apple Pages è stato salvato da macOS senza generare il file vettoriale interno QuickLook/Preview.pdf (opzione anteprima disattivata in Pages o salvataggio da archivio IWA compresso).'
+                  : errorInfo.message}
+              </p>
+            </div>
+          </div>
+
+          {errorInfo.isPagesError && (
+            <div className="space-y-3 pt-2 border-t border-amber-200/80 dark:border-amber-800/60">
+              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <HelpCircle className="w-4 h-4 text-amber-500" />
+                <span>Come ottenere subito il PDF (3 soluzioni rapide):</span>
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                {/* Soluzione 1: iCloud.com (senza Mac) */}
+                <div className="p-3.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-amber-900/50 space-y-2">
+                  <div className="flex items-center justify-between font-semibold text-slate-900 dark:text-slate-100">
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">1. Via Browser (Senza Mac)</span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">Consigliata</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
+                    Vai su <b>iCloud.com/pages</b> con qualsiasi account Apple (gratuito). Trascina il file, aprilo e clicca sui <b>tre puntini (...) ➔ Scarica una copia ➔ PDF</b>.
+                  </p>
+                  <a
+                    href="https://www.icloud.com/pages"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline pt-1"
+                  >
+                    <span>Apri Apple Pages su iCloud.com</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+
+                {/* Soluzione 2: Da Mac */}
+                <div className="p-3.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-amber-900/50 space-y-2">
+                  <div className="font-semibold text-slate-900 dark:text-slate-100">
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">2. Se hai un Mac</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
+                    Apri il file con Pages e seleziona <b>File ➔ Esporta come ➔ PDF...</b>.
+                    <br />
+                    <span className="text-slate-500 italic">
+                      Per abilitare sempre l'anteprima: File ➔ Avanzate ➔ Tipo di file ➔ "Archivio singolo".
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-900/5 dark:bg-white/5 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 flex items-start gap-2">
+                <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <span>
+                  <b>Alternativa Immediata</b>: Puoi convertire il file gratis su{' '}
+                  <a
+                    href="https://cloudconvert.com/pages-to-pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 dark:text-indigo-400 underline font-semibold"
+                  >
+                    CloudConvert Pages-to-PDF
+                  </a>{' '}
+                  e poi caricarlo qui per modificarlo o estrarre testi e immagini.
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-100 transition cursor-pointer shadow-xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Prova con un altro documento</span>
+            </button>
+          </div>
+        </div>
+      ) : downloadUrl ? (
         <div className="text-center py-8 space-y-5 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200 dark:border-emerald-800 p-6 sm:p-8">
           <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-2xs">
             <CheckCircle2 className="w-7 h-7" />
