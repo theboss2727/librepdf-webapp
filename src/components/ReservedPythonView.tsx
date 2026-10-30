@@ -166,7 +166,7 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
                 <span>🔑</span>
                 <span className="font-semibold">PIN di sicurezza:</span>
                 <code className="bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded font-mono font-bold tracking-widest text-slate-900 dark:text-slate-100">
-                  {showPinHint ? '' : '••••'}
+                  {showPinHint ? '1234' : '••••'}
                 </code>
               </span>
               <button

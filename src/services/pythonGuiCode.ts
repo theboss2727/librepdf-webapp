@@ -1017,18 +1017,43 @@ class LibrePDFApp(QMainWindow):
     # ----------------- OPERAZIONI CORE E RENDERING -----------------
 
     def open_pdf(self):
-        filepath, _ = QFileDialog.getOpenFileName(self, "Seleziona File PDF", "", "PDF Files (*.pdf)")
+        filepath, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleziona File (PDF o Apple Pages)",
+            "",
+            "File Supportati (*.pdf *.pages);;Documenti PDF (*.pdf);;Apple Pages (*.pages);;Tutti i File (*.*)"
+        )
         if filepath:
             try:
-                self.original_filepath = filepath
+                actual_pdf_path = filepath
+                is_pages = filepath.lower().endswith(".pages")
+                if is_pages:
+                    import zipfile, tempfile
+                    with zipfile.ZipFile(filepath, 'r') as z:
+                        pdf_name = None
+                        for name in z.namelist():
+                            if 'quicklook' in name.lower() and name.lower().endswith('.pdf'):
+                                pdf_name = name
+                                break
+                        if not pdf_name:
+                            raise FileNotFoundError("Nessuna anteprima PDF QuickLook trovata nel file .pages.")
+                        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+                        tmp.write(z.read(pdf_name))
+                        tmp.close()
+                        actual_pdf_path = tmp.name
+
+                self.original_filepath = actual_pdf_path
                 self.staged_edits_count = 0
                 self.history = []
-                self.handler.load_document(filepath)
+                self.handler.load_document(actual_pdf_path)
                 self.current_page = 0
                 self.rotation_offset = 0
                 count = self.handler.get_page_count()
 
-                self.file_name_lbl.setText(f"{os.path.basename(filepath)} ({count} pag.)")
+                display_name = os.path.basename(filepath)
+                if is_pages:
+                    display_name += " (da Apple Pages)"
+                self.file_name_lbl.setText(f"{display_name} ({count} pag.)")
                 self.total_pages_lbl.setText(f"/ {count}")
                 self.page_spin.setMaximum(count)
                 self.page_spin.setValue(1)
@@ -1040,9 +1065,9 @@ class LibrePDFApp(QMainWindow):
 
                 self.lbl_staged_status.setText("Nessuna modifica inserita")
                 self.render_current_page()
-                self.statusBar().showMessage(f"PDF caricato: {filepath}")
+                self.statusBar().showMessage(f"File caricato con successo: {filepath}")
             except Exception as e:
-                QMessageBox.critical(self, "Errore Caricamento", f"Impossibile aprire il file PDF:\\n{str(e)}")
+                QMessageBox.critical(self, "Errore Caricamento", f"Impossibile aprire il file:\\n{str(e)}")
 
     def reload_original_document(self):
         if not self.original_filepath or not os.path.exists(self.original_filepath):

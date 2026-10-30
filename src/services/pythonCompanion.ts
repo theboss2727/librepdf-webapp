@@ -463,6 +463,18 @@ class PDFHandler:
             with open(output_path.replace(".docx", ".txt"), "w", encoding="utf-8") as f:
                 f.write(full_text)
             raise RuntimeError("Libreria 'pdf2docx' non installata. Installa con: pip install pdf2docx")
+
+    @staticmethod
+    def convert_pages_to_pdf(pages_path: str, output_path: str) -> str:
+        """Estrae l'anteprima PDF vettoriale nativa da un file Apple Pages (.pages)."""
+        import zipfile
+        with zipfile.ZipFile(pages_path, 'r') as z:
+            for name in z.namelist():
+                if 'quicklook' in name.lower() and name.lower().endswith('.pdf'):
+                    with open(output_path, 'wb') as f_out:
+                        f_out.write(z.read(name))
+                    return output_path
+        raise FileNotFoundError("Nessun PDF QuickLook incorporato nel file .pages")
 `;
 
 export { PYTHON_PYQT6_GUI } from './pythonGuiCode';
@@ -665,11 +677,30 @@ handler.convert_to_docx("documento_convertito.docx")
 print("Conversione in Word (.docx) completata!")`;
 
     case 'docx-to-pdf':
-      return `# Conversione Word (.docx) in PDF
-from docx2pdf import convert
+      return `# Conversione Word (.docx) o Apple Pages (.pages) in PDF con Python
+import os
+import zipfile
 
-convert("documento.docx", "documento.pdf")
-print("Conversione in PDF completata con successo!")`;
+def convert_pages_to_pdf(pages_path: str, output_pdf: str = None) -> str:
+    """Estrae l'anteprima PDF vettoriale nativa generata dal motore Quartz di Apple."""
+    if not output_pdf:
+        output_pdf = os.path.splitext(pages_path)[0] + ".pdf"
+    with zipfile.ZipFile(pages_path, 'r') as z:
+        for name in z.namelist():
+            if 'quicklook' in name.lower() and name.lower().endswith('.pdf'):
+                with open(output_pdf, 'wb') as f_out:
+                    f_out.write(z.read(name))
+                print(f"Estratto PDF nativo vettoriale: {output_pdf}")
+                return output_pdf
+    raise FileNotFoundError("Nessuna anteprima PDF trovata nel file .pages")
+
+# Per Word (.docx):
+# from docx2pdf import convert
+# convert("documento.docx", "documento.pdf")
+
+# Per Apple Pages (.pages):
+# convert_pages_to_pdf("documento.pages", "documento.pdf")
+print("Snippet pronto per Word e Apple Pages!")`;
 
     case 'pdf-to-xlsx':
       return `# Estrazione tabelle PDF in Excel (.xlsx) con PyMuPDF

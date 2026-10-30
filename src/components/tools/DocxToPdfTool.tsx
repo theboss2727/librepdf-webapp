@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileCode, Download, CheckCircle2, Loader2, ArrowRight, Code2, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
-import { convertDocxToPdf } from '../../services/officeConverters';
+import { convertDocxToPdf, convertPagesToPdf } from '../../services/officeConverters';
 import { saveToVault } from '../../services/storageVault';
 
 interface DocxToPdfToolProps {
@@ -26,18 +26,24 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
 
   const handleConvert = async () => {
     if (!fileItem) return;
+    const isPages = fileItem.file.name.toLowerCase().endsWith('.pages');
     setIsProcessing(true);
     setProgress(10);
-    setStatusMsg('Caricamento file Word...');
+    setStatusMsg(isPages ? 'Caricamento pacchetto Apple Pages...' : 'Caricamento file Word...');
 
     try {
       const buffer = await fileItem.file.arrayBuffer();
-      const pdfBytes = await convertDocxToPdf(buffer, (pct, msg) => {
-        setProgress(pct);
-        setStatusMsg(msg);
-      });
+      const pdfBytes = isPages
+        ? await convertPagesToPdf(buffer, (pct, msg) => {
+            setProgress(pct);
+            setStatusMsg(msg);
+          })
+        : await convertDocxToPdf(buffer, (pct, msg) => {
+            setProgress(pct);
+            setStatusMsg(msg);
+          });
 
-      const baseName = fileItem.file.name.replace(/\.(docx|doc)$/i, '');
+      const baseName = fileItem.file.name.replace(/\.(docx|doc|pages)$/i, '');
       const pdfName = `${baseName}.pdf`;
       setOutputName(pdfName);
 
@@ -57,7 +63,7 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
       onSuccess();
       confetti({ particleCount: 50, spread: 55 });
     } catch (err: any) {
-      alert(`Errore conversione Word in PDF: ${err.message}`);
+      alert(`Errore conversione in PDF: ${err.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -83,14 +89,14 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                Word (.docx) in Documento PDF
+                Word (.docx) & Apple Pages (.pages) in PDF
               </h2>
               <span className="font-mono text-[10px] text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-300 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-900/60">
-                Mammoth + Vector Canvas
+                Mammoth + Apple QuickLook
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Trascodifica i file Word in documenti PDF impaginati professionalmente con tabelle, elenchi e intestazioni.
+              Trascodifica sia i file Word (.docx) sia i documenti Mac Apple Pages (.pages) in PDF vettoriali impaginati ad alta definizione.
             </p>
           </div>
         </div>
@@ -103,10 +109,10 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-              PDF Generato dal File Word con Successo!
+              Documento PDF Generato con Successo!
             </h3>
             <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
-              Impaginazione A4 conforme con numerazione pagine e resa tipografica vettoriale.
+              Impaginazione fedele con layout vettoriale, font e risoluzione originale.
             </p>
           </div>
 
@@ -144,10 +150,10 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({
           <FileDropzone
             files={files}
             onFilesChange={setFiles}
-            accept=".docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".docx,.doc,.pages,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             multiple={false}
-            title="Trascina qui il file Word (.docx) da convertire in PDF"
-            subtitle="Elaborazione immediata nel browser senza caricare file su server esterni."
+            title="Trascina qui il file Word (.docx) o Apple Pages (.pages)"
+            subtitle="Supporto diretto per documenti Word (.docx) e documenti Mac Apple Pages (.pages)."
           />
 
           {fileItem && (

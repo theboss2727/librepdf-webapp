@@ -3,6 +3,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+import JSZip from 'jszip';
 
 export interface DocxConversionOptions {
   includeImages?: boolean;
@@ -547,6 +548,59 @@ export async function convertDocxToPdf(
 }
 
 /**
+ * Convert an Apple Pages (.pages) document into native high-fidelity PDF
+ * In Apple Pages format, macOS/iOS embeds a full-fidelity native vector PDF
+ * for QuickLook previews inside the package container (`preview.pdf` or `QuickLook/Preview.pdf`).
+ * This function extracts that embedded high-resolution vector PDF using JSZip.
+ */
+export async function convertPagesToPdf(
+  pagesBuffer: ArrayBuffer,
+  onProgress?: (progress: number, status: string) => void
+): Promise<Uint8Array> {
+  onProgress?.(15, 'Analisi archivio documento Apple Pages...');
+  const zip = await JSZip.loadAsync(pagesBuffer);
+
+  // Common locations where Apple Pages embeds the rendered QuickLook PDF
+  const candidatePaths = [
+    'QuickLook/Preview.pdf',
+    'QuickLook/preview.pdf',
+    'preview.pdf',
+    'Preview.pdf',
+    'quicklook/preview.pdf',
+  ];
+
+  let pdfFile: JSZip.JSZipObject | null = null;
+  for (const path of candidatePaths) {
+    if (zip.file(path)) {
+      pdfFile = zip.file(path);
+      break;
+    }
+  }
+
+  // Fallback: search any .pdf inside the archive
+  if (!pdfFile) {
+    for (const relativePath in zip.files) {
+      if (relativePath.toLowerCase().endsWith('.pdf')) {
+        pdfFile = zip.file(relativePath);
+        break;
+      }
+    }
+  }
+
+  if (pdfFile) {
+    onProgress?.(65, 'Estrazione PDF vettoriale nativo Apple...');
+    const pdfData = await pdfFile.async('uint8array');
+    onProgress?.(100, 'Conversione documento Apple Pages completata!');
+    return pdfData;
+  }
+
+  // Fallback if no preview PDF was included inside the package
+  throw new Error(
+    "Il file .pages non contiene un'anteprima PDF interna (QuickLook/Preview.pdf). Per convertirlo, aprilo in Pages su Mac e scegli 'File ➔ Esporta come ➔ PDF', oppure caricalo su iCloud.com e scaricalo in PDF."
+  );
+}
+
+/**
  * Convert PDF tables and data records into a Microsoft Excel (.xlsx) workbook
  * 100% client-side via coordinate-based table clustering and SheetJS
  */
@@ -846,3 +900,4 @@ export async function convertXlsxToPdf(
   onProgress?.(100, 'Conversione completata!');
   return pdfBytes;
 }
+
