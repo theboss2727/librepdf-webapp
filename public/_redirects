@@ -1,0 +1,5 @@
+# FreeConvert API Proxy for Netlify Edge
+/api/freeconvert/*  https://api.freeconvert.com/:splat  200!
+
+# SPA Routing for Netlify
+/*  /index.html  200

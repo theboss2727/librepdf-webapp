@@ -26,6 +26,7 @@ import {
   Layers,
   Wrench,
   PenTool,
+  Cloud,
 } from 'lucide-react';
 import { PDF_TOOLS } from '../config/tools';
 import type { ToolId, ToolCategory } from '../types/pdf';
@@ -58,9 +59,11 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   SunMedium,
   Layers,
   Wrench,
+  Cloud,
 };
 
 const TOOL_COLOR_STYLES: Record<string, string> = {
+  'cloud-converter': 'bg-sky-50 text-sky-600 border-sky-200/80 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-900/40',
   merge: 'bg-rose-50 text-rose-600 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40',
   split: 'bg-amber-50 text-amber-600 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40',
   'edit-pdf': 'bg-amber-50 text-amber-600 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40',

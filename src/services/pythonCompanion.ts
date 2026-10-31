@@ -761,6 +761,48 @@ doc.save("immagini_unite.pdf")
 doc.close()
 print("Immagini legate in PDF con successo!")`;
 
+    case 'cloud-converter':
+      return `# Conversione Universale tramite FreeConvert REST API in Python
+import requests
+import time
+
+API_KEY = "LA_TUA_API_KEY_FREECONVERT"
+FILE_PATH = "documento.pages"
+OUTPUT_FORMAT = "pdf"
+
+headers = {"Authorization": f"Bearer {API_KEY}"}
+job_payload = {
+    "tasks": {
+        "import-file": {"operation": "import/upload"},
+        "convert-file": {"operation": "convert", "input": "import-file", "output_format": OUTPUT_FORMAT},
+        "export-file": {"operation": "export/url", "input": "convert-file"}
+    }
+}
+
+# 1. Creazione sessione
+job = requests.post("https://api.freeconvert.com/v1/process/jobs", json=job_payload, headers=headers).json()
+import_task = next(t for t in job["tasks"] if t["name"] == "import-file")
+form_data = import_task["result"]["form"]
+
+# 2. Caricamento file
+with open(FILE_PATH, "rb") as f:
+    requests.post(form_data["url"], data=form_data.get("parameters", {}), files={"file": f})
+
+# 3. Monitoraggio e download
+while True:
+    time.sleep(2)
+    status = requests.get(f"https://api.freeconvert.com/v1/process/jobs/{job['id']}", headers=headers).json()
+    if status["status"] == "completed":
+        export_task = next(t for t in status["tasks"] if t["name"] == "export-file")
+        content = requests.get(export_task["result"]["url"]).content
+        with open(f"risultato.{OUTPUT_FORMAT}", "wb") as out:
+            out.write(content)
+        print("Conversione completata con successo!")
+        break
+    elif status["status"] == "failed":
+        print("Conversione fallita.")
+        break`;
+
     default:
       return `# Utilizzo base del motore PyMuPDF PDFHandler
 from pdf_handler import PDFHandler

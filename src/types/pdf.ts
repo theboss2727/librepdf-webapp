@@ -20,6 +20,7 @@ export type ToolId =
   | 'repair'
   | 'compress'
   | 'protect'
+  | 'cloud-converter'
   | 'python-studio'
   | 'reserved-python'
   | 'vault';

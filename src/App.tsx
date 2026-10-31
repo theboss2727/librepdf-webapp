@@ -41,6 +41,7 @@ import { PdfToDocxTool } from './components/tools/PdfToDocxTool';
 import { DocxToPdfTool } from './components/tools/DocxToPdfTool';
 import { PdfToXlsxTool } from './components/tools/PdfToXlsxTool';
 import { XlsxToPdfTool } from './components/tools/XlsxToPdfTool';
+import { CloudConverterTool } from './components/tools/CloudConverterTool';
 import { PythonStudioModal } from './components/PythonStudioModal';
 import { VaultModal } from './components/VaultModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -235,6 +236,12 @@ export default function App() {
               )}
               {selectedToolId === 'images-to-pdf' && (
                 <ImagesToPdfTool onSuccess={refreshVaultStats} />
+              )}
+              {selectedToolId === 'cloud-converter' && (
+                <CloudConverterTool
+                  onSuccess={refreshVaultStats}
+                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
+                />
               )}
               {selectedToolId === 'compress' && (
                 <CompressTool onSuccess={refreshVaultStats} />
