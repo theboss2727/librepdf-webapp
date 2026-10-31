@@ -15,8 +15,6 @@ import {
   Sparkles,
   BookOpen,
   Code2,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import JSZip from 'jszip';
 import {
@@ -31,14 +29,11 @@ interface ReservedPythonViewProps {
   onBackToTools: () => void;
 }
 
-const DEFAULT_PIN = '1234';
-
 export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackToTools }) => {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [activeTab, setActiveTab] = useState<'zip' | 'main_gui' | 'handler' | 'requirements' | 'build_bat' | 'guide'>('zip');
-  const [showPinHint, setShowPinHint] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
@@ -52,12 +47,24 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput.trim() === DEFAULT_PIN || pinInput.trim().toLowerCase() === 'admin') {
+    const input = pinInput.trim();
+    if (!input) {
+      setErrorMsg('Inserisci il PIN di sicurezza.');
+      return;
+    }
+    const savedPin = localStorage.getItem('librepdf_admin_pin');
+    if (!savedPin) {
+      // Primo accesso: memorizza il PIN personale dell'utente
+      localStorage.setItem('librepdf_admin_pin', input);
+      sessionStorage.setItem('librepdf_reserved_access', 'true');
+      setIsUnlocked(true);
+      setErrorMsg('');
+    } else if (input === savedPin || input.toLowerCase() === 'admin') {
       sessionStorage.setItem('librepdf_reserved_access', 'true');
       setIsUnlocked(true);
       setErrorMsg('');
     } else {
-      setErrorMsg('PIN non valido. Inserisci il codice di sicurezza corretto.');
+      setErrorMsg('PIN errato. Inserisci il tuo codice di sicurezza.');
     }
   };
 
@@ -161,24 +168,6 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
               <span>Sblocca Area Riservata</span>
             </button>
 
-            <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-300 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <span>🔑</span>
-                <span className="font-semibold">PIN di sicurezza:</span>
-                <code className="bg-amber-100 dark:bg-amber-900 px-1.5 py-0.5 rounded font-mono font-bold tracking-widest text-slate-900 dark:text-slate-100">
-                  {showPinHint ? '1234' : '••••'}
-                </code>
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowPinHint((s) => !s)}
-                className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer transition"
-                title={showPinHint ? 'Nascondi PIN' : 'Mostra PIN'}
-              >
-                {showPinHint ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                <span>{showPinHint ? 'Nascondi' : 'Mostra'}</span>
-              </button>
-            </div>
           </form>
 
           <button
@@ -341,7 +330,7 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
                   <span className="text-amber-500">🖥️</span> main.py / app_gui.py
                 </div>
                 <p className="text-slate-500 text-[11px]">
-                  Applicazione desktop completa PyQt6 con canvas interattivo (trascinamento mouse, maniglia ridimensionamento ↘), intestazione ultra-compatta da 36px e modulo Modifica PDF avanzato.
+                  Interfaccia stile Adobe Acrobat / Foxit: barra ribbon (⏮ ◀ 1/N ▶ ⏭, zoom adatta larghezza/pagina, modalità notte), pannello miniature e indice TOC a scomparsa, cassetto Super Strumenti e Cloud Converter FreeConvert.
                 </p>
               </div>
 
@@ -350,7 +339,7 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
                   <span className="text-blue-500">📄</span> pdf_handler.py
                 </div>
                 <p className="text-slate-500 text-[11px]">
-                  Classe PDFHandler basata su PyMuPDF. Risolto il crash Windows 0xC0000409 con morph matrix e isolamento memoria.
+                  Motore PyMuPDF (fitz) con estrazione TOC, client REST FreeConvert integrato (<code className="text-amber-400">convert_via_freeconvert</code>), manipolazione avanzata, OCR, filigrana ed estrazione nativa .pages.
                 </p>
               </div>
 
@@ -359,7 +348,7 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
                   <span className="text-emerald-500">📦</span> requirements.txt
                 </div>
                 <p className="text-slate-500 text-[11px]">
-                  Dipendenze verificate: pymupdf, PyQt6, pyinstaller, pdf2docx, pandas, openpyxl, pillow.
+                  Dipendenze verificate: pymupdf, PyQt6, pyinstaller, requests, pdf2docx, pandas, openpyxl, pillow.
                 </p>
               </div>
 
@@ -368,7 +357,7 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
                   <span className="text-purple-500">⚙️</span> build_exe.bat
                 </div>
                 <p className="text-slate-500 text-[11px]">
-                  Script batch 1-click per compilare automaticamente in file autonomo `dist/LibrePDFStudio.exe`.
+                  Script batch 1-click per compilare automaticamente in file autonomo `dist/LibrePdf/LibrePdf.exe` con asset MuPDF inclusi.
                 </p>
               </div>
             </div>

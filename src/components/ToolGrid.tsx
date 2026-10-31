@@ -103,7 +103,6 @@ export const ToolGrid: React.FC<ToolGridProps> = ({
     { id: 'convert', label: 'Conversione & OCR' },
     { id: 'edit', label: 'Manipolazione & Filigrana' },
     { id: 'security', label: 'Sicurezza & Storage' },
-    { id: 'developer', label: 'Python & .EXE' },
   ];
 
   const filteredTools = PDF_TOOLS.filter((tool) => {

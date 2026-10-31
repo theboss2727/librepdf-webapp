@@ -93,16 +93,8 @@ export const EngineeringHero: React.FC<EngineeringHeroProps> = ({
           <span>·</span>
           <span className="hidden sm:inline">ZERO TRASMISSIONE RETE</span>
           <span className="hidden sm:inline">·</span>
-          <span>MOTORE PyMuPDF 1.25.x COMPATIBILE</span>
+          <span>ELABORAZIONE LOCALE 100% RISERVATA</span>
         </div>
-
-        <button
-          onClick={onOpenPythonStudio}
-          className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer font-medium text-slate-700 dark:text-slate-300"
-        >
-          <span>Script Companion .EXE</span>
-          <ArrowRight className="w-3 h-3 text-rose-500" />
-        </button>
       </div>
 
       {/* Main Grid: Headline + Quick Action Ingestion Box */}

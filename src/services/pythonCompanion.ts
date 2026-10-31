@@ -7,6 +7,7 @@
 export const PYTHON_REQUIREMENTS = `pymupdf>=1.23.0
 PyQt6>=6.5.0
 pyinstaller>=6.0.0
+requests>=2.28.0
 pdf2docx>=0.5.6
 pandas>=2.0.0
 openpyxl>=3.1.0
@@ -464,6 +465,15 @@ class PDFHandler:
                 f.write(full_text)
             raise RuntimeError("Libreria 'pdf2docx' non installata. Installa con: pip install pdf2docx")
 
+    def get_toc(self) -> list:
+        """Restituisce l'indice (Table of Contents / Segnalibri) del documento."""
+        if not self.doc:
+            return []
+        try:
+            return self.doc.get_toc()
+        except Exception:
+            return []
+
     @staticmethod
     def convert_pages_to_pdf(pages_path: str, output_path: str) -> str:
         """Estrae l'anteprima PDF vettoriale nativa da un file Apple Pages (.pages)."""
@@ -475,6 +485,151 @@ class PDFHandler:
                         f_out.write(z.read(name))
                     return output_path
         raise FileNotFoundError("Nessun PDF QuickLook incorporato nel file .pages")
+
+    @staticmethod
+    def convert_via_freeconvert(
+        input_path: str,
+        target_format: str,
+        api_key: str,
+        output_path: str = None,
+        progress_callback=None
+    ) -> str:
+        """
+        Converte qualsiasi file (Apple Pages .pages, Word, Excel, immagini, ecc.)
+        utilizzando le API REST ufficiali di FreeConvert.com.
+        
+        Supporta upload multipart, polling asincrono dello stato e download finale.
+        progress_callback: funzione opzionale f(percent: int, status_msg: str)
+        """
+        import requests
+        import time
+
+        if not api_key:
+            raise ValueError("API Key FreeConvert non fornita. Inseriscila nelle impostazioni.")
+        if not os.path.exists(input_path):
+            raise FileNotFoundError(f"File di input non trovato: {input_path}")
+
+        if progress_callback:
+            progress_callback(10, "Inizializzazione sessione di conversione FreeConvert...")
+
+        headers = {
+            "Authorization": f"Bearer {api_key.strip()}",
+            "Content-Type": "application/json"
+        }
+
+        target_fmt = target_format.lower().lstrip(".")
+        filename = os.path.basename(input_path)
+        base_name, _ = os.path.splitext(filename)
+        if not output_path:
+            output_path = os.path.join(os.path.dirname(input_path) or ".", f"{base_name}.{target_fmt}")
+
+        # 1. Creazione del Job FreeConvert
+        payload = {
+            "tasks": {
+                "import-1": {
+                    "operation": "import/upload"
+                },
+                "convert-1": {
+                    "operation": "convert",
+                    "input": "import-1",
+                    "output_format": target_fmt
+                },
+                "export-1": {
+                    "operation": "export/url",
+                    "input": "convert-1"
+                }
+            }
+        }
+
+        resp = requests.post("https://api.freeconvert.com/v1/process/jobs", json=payload, headers=headers)
+        if resp.status_code >= 400:
+            err_msg = resp.text
+            try:
+                err_data = resp.json()
+                err_msg = err_data.get("message") or err_data.get("error") or str(err_data)
+            except Exception:
+                pass
+            raise RuntimeError(f"Errore creazione Job FreeConvert (HTTP {resp.status_code}): {err_msg}")
+
+        job_data = resp.json()
+        job_id = job_data.get("id")
+        tasks = job_data.get("tasks", [])
+        import_task = next((t for t in tasks if t.get("name") == "import-1"), None)
+        if not import_task or "result" not in import_task:
+            raise RuntimeError("Risposta API FreeConvert non valida: operazione di upload non trovata.")
+
+        form_info = import_task["result"]["form"]
+        upload_url = form_info["url"]
+        upload_params = form_info.get("parameters", {})
+
+        # 2. Upload del file locale
+        if progress_callback:
+            progress_callback(30, f"Caricamento file '{filename}' su FreeConvert...")
+
+        with open(input_path, "rb") as file_obj:
+            files = {"file": file_obj}
+            up_resp = requests.post(upload_url, data=upload_params, files=files)
+            if up_resp.status_code >= 400:
+                raise RuntimeError(f"Errore caricamento file su FreeConvert (HTTP {up_resp.status_code})")
+
+        # 3. Monitoraggio avanzamento (Polling)
+        if progress_callback:
+            progress_callback(55, "Conversione in corso nei cloud server FreeConvert...")
+
+        poll_headers = {"Authorization": f"Bearer {api_key.strip()}"}
+        export_url = None
+        max_attempts = 120  # fino a 4 minuti per file complessi
+        for attempt in range(max_attempts):
+            time.sleep(2)
+            check_resp = requests.get(f"https://api.freeconvert.com/v1/process/jobs/{job_id}", headers=poll_headers)
+            if check_resp.status_code >= 400:
+                continue
+
+            status_json = check_resp.json()
+            job_status = status_json.get("status")
+
+            # Calcolo avanzamento
+            current_tasks = status_json.get("tasks", [])
+            convert_task = next((t for t in current_tasks if t.get("name") == "convert-1"), None)
+            if convert_task:
+                step_status = convert_task.get("status", "")
+                if step_status == "processing":
+                    pct = min(85, 60 + attempt)
+                    if progress_callback:
+                        progress_callback(pct, "Conversione cloud in corso...")
+
+            if job_status == "completed":
+                export_task = next((t for t in current_tasks if t.get("name") == "export-1"), None)
+                if export_task and "result" in export_task and "url" in export_task["result"]:
+                    export_url = export_task["result"]["url"]
+                    break
+            elif job_status == "failed":
+                reason = "Conversione non riuscita su FreeConvert."
+                for t in current_tasks:
+                    if t.get("status") == "failed" and "message" in t:
+                        reason = t["message"]
+                raise RuntimeError(f"Errore conversione FreeConvert: {reason}")
+
+        if not export_url:
+            raise TimeoutError("Tempo massimo per la conversione superato o URL di download non generato.")
+
+        # 4. Download del file convertito
+        if progress_callback:
+            progress_callback(90, f"Download del file convertito in corso...")
+
+        dl_resp = requests.get(export_url, stream=True)
+        if dl_resp.status_code >= 400:
+            raise RuntimeError(f"Impossibile scaricare il file convertito (HTTP {dl_resp.status_code})")
+
+        with open(output_path, "wb") as out_file:
+            for chunk in dl_resp.iter_content(chunk_size=65536):
+                if chunk:
+                    out_file.write(chunk)
+
+        if progress_callback:
+            progress_callback(100, f"Conversione completata: {os.path.basename(output_path)}")
+
+        return output_path
 `;
 
 export { PYTHON_PYQT6_GUI } from './pythonGuiCode';
@@ -501,9 +656,15 @@ echo ===================================================
 pause
 `;
 
-export const PYTHON_README = `# LibrePDF Desktop Engine (.exe) & PyMuPDF Integration
+export const PYTHON_README = `# LibrePDF Desktop Engine (.exe) & PyMuPDF Modern Reader Studio
 
-Questo pacchetto contiene il motore Python completo e l'applicazione grafica desktop **PyQt6** dotata di barra degli strumenti, anteprima con zoom vettoriale e barra laterale con tutti gli strumenti di manipolazione PDF, incluso il nuovo modulo **Modifica PDF**.
+Questo pacchetto contiene il motore Python completo e la nuova applicazione grafica desktop **PyQt6** ridisegnata sul modello dei migliori lettori PDF (Adobe Acrobat / Foxit):
+- **Esperienza di Lettura Confortevole**: Barra di navigazione pagine fluida (prima, precedente, salto pagina diretto, successiva, ultima), zoom personalizzato, **Adatta Larghezza** (Fit to Width), **Adatta Pagina** (Fit to Page), rotazione vista e **Modalità Lettura Scura / Notte**.
+- **Pannello Laterale a Scomparsa (Navigatore)**: Miniature rapide di tutte le pagine per il salto immediato, Indice capitoli/Segnalibri (TOC) ed Info sul documento.
+- **Cassetto Super Strumenti a Scomparsa**: Puoi richiuderlo durante la lettura per goderti il documento a tutto schermo, ed aprirlo con 1 click o scorciatoia per usare tutti i super-tools.
+- **Cloud Converter Universale (FreeConvert REST API)**: Converti qualsiasi file (.pages Apple, Word, Excel, PowerPoint, immagini HEIC, ecc.) in PDF o viceversa, con barra di avanzamento e monitoraggio polling.
+- **Modifica PDF Interattiva**: Caselle di testo con colore di sfondo personalizzabile (bianco, post-it, palette), bordo, testo in tempo reale, maniglia di ridimensionamento ↘, firme grafiche e icona rossa ✕ di eliminazione immediata.
+- **Strumenti Completi**: OCR Tesseract, filigrana vettoriale, dividi/estrai, unisci PDF, esporta Word, Excel, immagini ad alta risoluzione, scala di grigi csGRAY, riparazione XRef e appiattimento moduli.
 
 ## 🚀 Guida Rapida per PyCharm o VSCode
 
@@ -521,9 +682,9 @@ python main.py
 *(oppure \`python app_gui.py\`)*
 
 ### 3. File Inclusi:
-- \`main.py\` / \`app_gui.py\`: Applicazione completa in **PyQt6** con canvas interattivo (posizionamento e ridimensionamento ↘ con mouse in tempo reale), intestazione ultra-compatta da 36px (80%+ spazio all'area di lavoro), e scheda **✏️ Modifica PDF** (inserimento testi con contorno e sfondo, immagini ridimensionabili con cornice, firme, coordinate sincronizzate).
-- \`pdf_handler.py\`: Motore logico basato su **PyMuPDF (fitz)** con metodi dedicati: \`insert_custom_text\`, \`insert_custom_image\`, \`save_edited_document\`, OCR, filigrana, ecc.
-- \`requirements.txt\`: Tutte le dipendenze Python con versioni compatibili.
+- \`main.py\` / \`app_gui.py\`: Applicazione completa in **PyQt6** con interfaccia stile Acrobat Reader, navigatore miniature laterale, canvas con ombra e pagina centrata, e cassetto laterale a schede con tutti i Super Strumenti.
+- \`pdf_handler.py\`: Motore logico basato su **PyMuPDF (fitz)** con metodi per lettura, manipolazione avanzata, OCR, modifica, estrazione TOC e client REST FreeConvert integrato (\`convert_via_freeconvert\`).
+- \`requirements.txt\`: Tutte le dipendenze Python con versioni compatibili (\`pymupdf\`, \`PyQt6\`, \`requests\`, \`pdf2docx\`, \`pandas\`, \`openpyxl\`, \`pillow\`).
 - \`build_exe.bat\`: Script automatico a 1-click per compilare l'eseguibile autonomo **LibrePdf.exe** per Windows (con flag \`--collect-data pymupdf\`).
 
 ## 🔨 Come generare l'eseguibile .EXE

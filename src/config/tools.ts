@@ -311,18 +311,4 @@ export const PDF_TOOLS: ToolDefinition[] = [
     multiple: false,
     color: 'from-slate-700/20 to-zinc-800/20 text-slate-300 border-slate-600/30',
   },
-  {
-    id: 'python-studio',
-    title: 'Motore Python & Compilatore .EXE',
-    subtitle: 'Architettura PyMuPDF & Generatore Desktop',
-    description: 'Esporta il motore PDFHandler, la GUI desktop PyQt6 e lo script PyInstaller per compilare la tua applicazione .exe nativa.',
-    category: 'developer',
-    iconName: 'Terminal',
-    badge: 'PyMuPDF Desktop',
-    shortcutKey: 'Y',
-    technicalSpec: 'PyMuPDF (fitz) + PyQt6 + PyInstaller',
-    accepts: '.pdf',
-    multiple: false,
-    color: 'from-amber-600/20 to-yellow-600/20 text-amber-300 border-amber-500/30',
-  },
 ];

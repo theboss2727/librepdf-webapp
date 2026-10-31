@@ -147,15 +147,6 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             )}
           </button>
-
-          {/* Primary Action Button: Python Desktop Engine */}
-          <button
-            onClick={onOpenPythonStudio}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition shadow-xs cursor-pointer whitespace-nowrap"
-          >
-            <Code2 className="w-3.5 h-3.5 text-rose-400 dark:text-rose-600" />
-            <span>Python .EXE</span>
-          </button>
         </div>
       </div>
     </header>
