@@ -116,31 +116,31 @@ export const EngineeringHero: React.FC<EngineeringHeroProps> = ({
               onClick={() => onSelectTool('merge')}
               className="px-3.5 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition shadow-xs cursor-pointer"
             >
-              Unisci PDF
+              ⚡ Task PDF
             </button>
             <button
-              onClick={() => onSelectTool('pdf-to-docx')}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 transition cursor-pointer shadow-2xs"
+              onClick={() => onSelectTool('local-top-converter')}
+              className="px-3.5 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold hover:bg-indigo-100 transition cursor-pointer shadow-2xs"
             >
-              PDF in Word (.docx)
+              🖥️ Conversione Top Locale
             </button>
             <button
-              onClick={() => onSelectTool('pdf-to-xlsx')}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 font-semibold hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/50 transition cursor-pointer shadow-2xs"
+              onClick={() => onSelectTool('cloud-converter')}
+              className="px-3.5 py-2 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50/50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-bold hover:bg-sky-100 transition cursor-pointer shadow-2xs"
             >
-              PDF in Excel (.xlsx)
+              ☁️ Cloud FreeConvert (API)
             </button>
             <button
-              onClick={() => onSelectTool('pdf-to-images')}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 font-semibold hover:border-orange-300 dark:hover:border-orange-700 hover:bg-orange-50/50 transition cursor-pointer shadow-2xs"
+              onClick={() => onSelectTool('edit-pdf')}
+              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 font-semibold hover:border-rose-300 hover:bg-rose-50/40 transition cursor-pointer shadow-2xs"
             >
-              PDF in JPG / PNG
+              ✏️ Modifica & Firme
             </button>
             <button
               onClick={() => onSelectTool('ocr-pdf')}
               className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
             >
-              OCR Tesseract
+              🔍 OCR Tesseract
             </button>
           </div>
         </div>

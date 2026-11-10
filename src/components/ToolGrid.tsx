@@ -27,6 +27,10 @@ import {
   Wrench,
   PenTool,
   Cloud,
+  Cpu,
+  Monitor,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import { PDF_TOOLS } from '../config/tools';
 import type { ToolId, ToolCategory } from '../types/pdf';
@@ -60,9 +64,12 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   Layers,
   Wrench,
   Cloud,
+  Cpu,
+  Monitor,
 };
 
 const TOOL_COLOR_STYLES: Record<string, string> = {
+  'local-top-converter': 'bg-indigo-50 text-indigo-600 border-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900/40',
   'cloud-converter': 'bg-sky-50 text-sky-600 border-sky-200/80 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-900/40',
   merge: 'bg-rose-50 text-rose-600 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40',
   split: 'bg-amber-50 text-amber-600 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40',
@@ -99,10 +106,10 @@ export const ToolGrid: React.FC<ToolGridProps> = ({
 
   const categories: { id: ToolCategory; label: string }[] = [
     { id: 'all', label: 'Tutti i Moduli' },
-    { id: 'organize', label: 'Organizzazione Flussi' },
-    { id: 'convert', label: 'Conversione & OCR' },
-    { id: 'edit', label: 'Manipolazione & Filigrana' },
-    { id: 'security', label: 'Sicurezza & Storage' },
+    { id: 'organize', label: '⚡ Task PDF (Locale)' },
+    { id: 'convert', label: '🔄 Convertitori Formati' },
+    { id: 'edit', label: '✏️ Modifica & Firme' },
+    { id: 'security', label: '🔒 Sicurezza & OCR' },
   ];
 
   const filteredTools = PDF_TOOLS.filter((tool) => {
@@ -117,7 +124,77 @@ export const ToolGrid: React.FC<ToolGridProps> = ({
   });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* 3 Macro-Sections Architecture Cards (The 3 Pillars) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        {/* Card 1: Task PDF Locale */}
+        <div
+          onClick={() => {
+            setActiveCategory('organize');
+            setSearch('');
+          }}
+          className={`p-4.5 rounded-2xl border transition-all cursor-pointer group ${
+            activeCategory === 'organize'
+              ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/60 shadow-xs ring-1 ring-rose-400/30'
+              : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 hover:border-rose-300 shadow-2xs hover:shadow-xs'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300">
+              <Zap className="w-3 h-3" />
+              100% LOCALE & PRIVACY
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">Zero Upload</span>
+          </div>
+          <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-rose-600 transition-colors">
+            1. Task & Modifica PDF
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+            Unisci, dividi, firma, ruota, filigrana, comprimi e OCR. Velocità istantanea senza limiti di dimensione file.
+          </p>
+        </div>
+
+        {/* Card 2: Conversione Top Locale */}
+        <div
+          onClick={() => onSelectTool('local-top-converter')}
+          className="p-4.5 rounded-2xl border transition-all cursor-pointer group bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 hover:border-indigo-400 shadow-2xs hover:shadow-xs hover:-translate-y-0.5"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+              <Cpu className="w-3 h-3" />
+              TOP FEDELTÀ NATIVA
+            </span>
+            <span className="text-[10px] text-indigo-500 font-mono">100% Word</span>
+          </div>
+          <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">
+            2. Conversione Top Locale
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+            Motore di sistema Word/LibreOffice sul tuo PC. Layout identico al 100%, batch per intere cartelle, zero cloud.
+          </p>
+        </div>
+
+        {/* Card 3: Conversione Cloud Top */}
+        <div
+          onClick={() => onSelectTool('cloud-converter')}
+          className="p-4.5 rounded-2xl border transition-all cursor-pointer group bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 hover:border-sky-400 shadow-2xs hover:shadow-xs hover:-translate-y-0.5"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
+              <Cloud className="w-3 h-3" />
+              FREECONVERT API
+            </span>
+            <span className="text-[10px] text-sky-500 font-mono">750 Crediti/m</span>
+          </div>
+          <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-sky-600 transition-colors">
+            3. Conversione Cloud Top
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+            Motore Cloud per Apple Pages, DOCX, DOC legacy, PPTX, XLSX. Layout perfetto 1:1 con la tua API Key personale.
+          </p>
+        </div>
+      </div>
+
       {/* Control Bar: Categories + View Switcher + Search */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-1">
         {/* Category Segmented Control */}

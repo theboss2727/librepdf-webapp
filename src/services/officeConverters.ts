@@ -278,16 +278,110 @@ export async function convertPdfToDocx(
 }
 
 /**
+ * Helper to safely sanitize text for pdf-lib StandardFonts (WinAnsi encoding)
+ * Prevents "WinAnsi cannot encode" crashes by decomposing accents and replacing unsupported glyphs
+ */
+function sanitizeForStandardFont(text: string, font: any): string {
+  if (!text) return '';
+  let cleaned = text
+    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Zero-width spaces
+    .replace(/\u00A0/g, ' ') // Non-breaking space
+    .replace(/[\u2010-\u2012]/g, '-') // Hyphens
+    .replace(/[\u2192\u21D2]/g, '->')
+    .replace(/[\u2190\u21D0]/g, '<-')
+    .replace(/[\u2194\u21D4]/g, '<->')
+    .replace(/[\u2713\u2714]/g, '[x]')
+    .replace(/[\u2717\u2718]/g, '[ ]')
+    .replace(/[\u25CF\u25E6\u25AA\u25AB\u2023]/g, '•')
+    .replace(/\t/g, '    ')
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''); // Emojis / surrogate pairs
+
+  let result = '';
+  for (const char of cleaned) {
+    try {
+      font.widthOfTextAtSize(char, 11);
+      result += char;
+    } catch {
+      // Try decomposing diacritics (e.g. ą -> a, ś -> s)
+      const decomposed = char.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      try {
+        font.widthOfTextAtSize(decomposed, 11);
+        result += decomposed;
+      } catch {
+        result += ' ';
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Convert a Microsoft Word (.docx) file into a high-quality PDF document
  * 100% client-side using mammoth HTML parser and pdf-lib vector layout engine
+ * Supports text, headings, bullet/numbered lists, tables with multi-line wrapping, and embedded images
  */
 export async function convertDocxToPdf(
   docxBuffer: ArrayBuffer,
   onProgress?: (progress: number, status: string) => void
 ): Promise<Uint8Array> {
   onProgress?.(15, 'Analisi struttura documento Word (.docx)...');
-  const result = await mammoth.convertToHtml({ arrayBuffer: docxBuffer });
-  const html = result.value;
+
+  // Store for embedded images extracted from docx
+  const imageStore = new Map<string, { buffer: Uint8Array; contentType: string }>();
+  let imageCounter = 0;
+
+  let html = '';
+  try {
+    const mammothOptions: any = {
+      arrayBuffer: docxBuffer,
+      convertImage: (mammoth as any).images?.imgElement
+        ? (mammoth as any).images.imgElement(async (image: any) => {
+            try {
+              const imgBuffer = await image.read();
+              const id = `img_${imageCounter++}`;
+              imageStore.set(id, {
+                buffer: new Uint8Array(imgBuffer),
+                contentType: image.contentType || 'image/png',
+              });
+              return { src: `docx-embedded://${id}` };
+            } catch {
+              return { src: '' };
+            }
+          })
+        : undefined,
+    };
+
+    if (typeof Buffer !== 'undefined' && Buffer.from) {
+      mammothOptions.buffer = Buffer.from(docxBuffer);
+    }
+
+    const result = await mammoth.convertToHtml(mammothOptions, {
+      convertImage: mammothOptions.convertImage,
+    });
+    html = result.value;
+  } catch (mammothErr: any) {
+    console.warn('Mammoth parser warning, attempting OpenXML fallback:', mammothErr);
+    // Fallback: extract text directly from word/document.xml via JSZip
+    try {
+      const zip = await JSZip.loadAsync(docxBuffer);
+      const docXml = await zip.file('word/document.xml')?.async('text');
+      if (docXml) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(docXml, 'application/xml');
+        const paragraphs = Array.from(xmlDoc.getElementsByTagName('w:p'));
+        html = paragraphs
+          .map((p) => `<p>${p.textContent || ''}</p>`)
+          .filter((p) => p !== '<p></p>')
+          .join('');
+      }
+    } catch (zipErr) {
+      throw new Error(`Impossibile leggere il documento Word (.docx): ${mammothErr.message || mammothErr}`);
+    }
+  }
+
+  if (!html || html.trim() === '') {
+    html = '<p>[Documento Word vuoto o senza testo]</p>';
+  }
 
   onProgress?.(35, 'Composizione layout vettoriale PDF...');
   const parser = new DOMParser();
@@ -328,13 +422,20 @@ export async function convertDocxToPdf(
 
   // Helper to wrap text into lines fitting within a specified maxWidth
   const wrapText = (text: string, font: any, fontSize: number, maxWidth: number): string[] => {
-    const words = text.split(/\s+/);
+    const sanitized = sanitizeForStandardFont(text, font);
+    if (!sanitized) return [];
+    const words = sanitized.split(/\s+/);
     const lines: string[] = [];
     let currentLine = '';
 
     for (const word of words) {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
-      const width = font.widthOfTextAtSize(testLine, fontSize);
+      let width = 0;
+      try {
+        width = font.widthOfTextAtSize(testLine, fontSize);
+      } catch {
+        width = maxWidth + 1; // force split on issue
+      }
       if (width <= maxWidth) {
         currentLine = testLine;
       } else {
@@ -353,18 +454,54 @@ export async function convertDocxToPdf(
   for (let idx = 0; idx < bodyChildren.length; idx++) {
     const el = bodyChildren[idx];
     const tagName = el.tagName.toLowerCase();
-    const text = (el.textContent || '').trim();
+    const rawText = (el.textContent || '').trim();
 
     onProgress?.(
       Math.round(40 + (idx / totalElements) * 50),
       `Trascrizione contenuti: ${idx + 1}/${totalElements}`
     );
 
+    // 1. Check for embedded images inside this element
+    const imgEl = tagName === 'img' ? (el as HTMLImageElement) : el.querySelector('img');
+    if (imgEl && imgEl.getAttribute('src')?.startsWith('docx-embedded://')) {
+      const imgId = imgEl.getAttribute('src')!.replace('docx-embedded://', '');
+      const imgData = imageStore.get(imgId);
+      if (imgData) {
+        try {
+          const isPng = imgData.contentType.toLowerCase().includes('png');
+          const embedded = isPng
+            ? await pdfDoc.embedPng(imgData.buffer)
+            : await pdfDoc.embedJpg(imgData.buffer);
+
+          const maxW = Math.min(availableWidth, 480);
+          const maxH = 320;
+          const scaled = embedded.scaleToFit(maxW, maxH);
+
+          ensureSpace(scaled.height + 15);
+          currentPage.drawImage(embedded, {
+            x: margin + (availableWidth - scaled.width) / 2,
+            y: currentY - scaled.height,
+            width: scaled.width,
+            height: scaled.height,
+          });
+          currentY -= scaled.height + 15;
+        } catch (imgErr) {
+          console.warn('Errore embedding immagine DOCX:', imgErr);
+        }
+      }
+    }
+
+    // If it was solely an image tag, proceed to next
+    if (tagName === 'img') {
+      continue;
+    }
+
+    // 2. Headings (h1, h2, h3, h4)
     if (tagName === 'h1') {
       ensureSpace(35);
-      const lines = wrapText(text, fontBold, 18, availableWidth);
+      const lines = wrapText(rawText, fontBold, 18, availableWidth);
       for (const line of lines) {
-        ensureSpace(22);
+        ensureSpace(24);
         currentPage.drawText(line, {
           x: margin,
           y: currentY - 18,
@@ -377,9 +514,9 @@ export async function convertDocxToPdf(
       currentY -= 8;
     } else if (tagName === 'h2') {
       ensureSpace(30);
-      const lines = wrapText(text, fontBold, 15, availableWidth);
+      const lines = wrapText(rawText, fontBold, 15, availableWidth);
       for (const line of lines) {
-        ensureSpace(18);
+        ensureSpace(20);
         currentPage.drawText(line, {
           x: margin,
           y: currentY - 15,
@@ -390,11 +527,11 @@ export async function convertDocxToPdf(
         currentY -= 20;
       }
       currentY -= 6;
-    } else if (tagName === 'h3') {
+    } else if (tagName === 'h3' || tagName === 'h4') {
       ensureSpace(25);
-      const lines = wrapText(text, fontBold, 13, availableWidth);
+      const lines = wrapText(rawText, fontBold, 13, availableWidth);
       for (const line of lines) {
-        ensureSpace(16);
+        ensureSpace(17);
         currentPage.drawText(line, {
           x: margin,
           y: currentY - 13,
@@ -406,17 +543,19 @@ export async function convertDocxToPdf(
       }
       currentY -= 4;
     } else if (tagName === 'p') {
-      if (!text) {
+      if (!rawText) {
         currentY -= 8;
         continue;
       }
-      const isBold = el.querySelector('strong, b') !== null;
+
+      // Check inner styling
+      const isBold = el.querySelector('strong, b') !== null && el.textContent === el.querySelector('strong, b')?.textContent;
       const isItalic = el.querySelector('em, i') !== null;
       const font = isBold ? fontBold : isItalic ? fontItalic : fontRegular;
       const fontSize = 11;
       const lineHeight = 15;
 
-      const lines = wrapText(text, font, fontSize, availableWidth);
+      const lines = wrapText(rawText, font, fontSize, availableWidth);
       for (const line of lines) {
         ensureSpace(lineHeight);
         currentPage.drawText(line, {
@@ -456,77 +595,93 @@ export async function convertDocxToPdf(
 
       const colCount = Math.max(...rows.map((r) => r.querySelectorAll('th, td').length)) || 1;
       const colWidth = availableWidth / colCount;
-      const cellHeight = 22;
 
       for (let rIdx = 0; rIdx < rows.length; rIdx++) {
-        ensureSpace(cellHeight);
         const cells = Array.from(rows[rIdx].querySelectorAll('th, td'));
         const isHeader = rIdx === 0 || rows[rIdx].querySelector('th') !== null;
+        const cellFont = isHeader ? fontBold : fontRegular;
+        const cellFontSize = 9.5;
+
+        // Wrap lines for all cells in this row to determine required row height
+        const cellWrappedLines: string[][] = [];
+        let maxLinesInRow = 1;
+
+        for (let cIdx = 0; cIdx < colCount; cIdx++) {
+          const cell = cells[cIdx];
+          const cellText = (cell?.textContent || '').trim();
+          const lines = wrapText(cellText, cellFont, cellFontSize, colWidth - 12);
+          cellWrappedLines.push(lines);
+          if (lines.length > maxLinesInRow) {
+            maxLinesInRow = lines.length;
+          }
+        }
+
+        const rowHeight = Math.max(22, maxLinesInRow * 13 + 8);
+        ensureSpace(rowHeight);
 
         // Background for header or alternating row
         if (isHeader) {
           currentPage.drawRectangle({
             x: margin,
-            y: currentY - cellHeight,
+            y: currentY - rowHeight,
             width: availableWidth,
-            height: cellHeight,
+            height: rowHeight,
             color: rgb(0.93, 0.95, 0.98),
           });
         } else if (rIdx % 2 === 1) {
           currentPage.drawRectangle({
             x: margin,
-            y: currentY - cellHeight,
+            y: currentY - rowHeight,
             width: availableWidth,
-            height: cellHeight,
+            height: rowHeight,
             color: rgb(0.98, 0.99, 1.0),
           });
         }
 
-        // Cell borders and text
+        // Draw cell contents and vertical borders
         for (let cIdx = 0; cIdx < colCount; cIdx++) {
-          const cell = cells[cIdx];
-          const cellText = (cell?.textContent || '').trim();
+          const lines = cellWrappedLines[cIdx] || [];
           const cellX = margin + cIdx * colWidth;
 
           // Draw vertical border
           currentPage.drawLine({
             start: { x: cellX, y: currentY },
-            end: { x: cellX, y: currentY - cellHeight },
+            end: { x: cellX, y: currentY - rowHeight },
             thickness: 0.5,
             color: rgb(0.8, 0.85, 0.9),
           });
 
-          // Draw cell text
-          if (cellText) {
-            const font = isHeader ? fontBold : fontRegular;
-            const truncated = cellText.length > 25 ? cellText.slice(0, 23) + '...' : cellText;
-            currentPage.drawText(truncated, {
+          // Draw all wrapped lines inside the cell
+          let lineY = currentY - 12;
+          for (const line of lines) {
+            currentPage.drawText(line, {
               x: cellX + 5,
-              y: currentY - 14,
-              size: 9.5,
-              font,
+              y: lineY,
+              size: cellFontSize,
+              font: cellFont,
               color: isHeader ? rgb(0.08, 0.12, 0.2) : rgb(0.2, 0.22, 0.26),
             });
+            lineY -= 13;
           }
         }
 
         // Right border
         currentPage.drawLine({
           start: { x: margin + availableWidth, y: currentY },
-          end: { x: margin + availableWidth, y: currentY - cellHeight },
+          end: { x: margin + availableWidth, y: currentY - rowHeight },
           thickness: 0.5,
           color: rgb(0.8, 0.85, 0.9),
         });
 
         // Bottom border
         currentPage.drawLine({
-          start: { x: margin, y: currentY - cellHeight },
-          end: { x: margin + availableWidth, y: currentY - cellHeight },
+          start: { x: margin, y: currentY - rowHeight },
+          end: { x: margin + availableWidth, y: currentY - rowHeight },
           thickness: isHeader ? 1 : 0.5,
           color: rgb(0.8, 0.85, 0.9),
         });
 
-        currentY -= cellHeight;
+        currentY -= rowHeight;
       }
       currentY -= 8;
     }

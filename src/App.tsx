@@ -42,6 +42,7 @@ import { DocxToPdfTool } from './components/tools/DocxToPdfTool';
 import { PdfToXlsxTool } from './components/tools/PdfToXlsxTool';
 import { XlsxToPdfTool } from './components/tools/XlsxToPdfTool';
 import { CloudConverterTool } from './components/tools/CloudConverterTool';
+import { LocalTopConverterHub } from './components/LocalTopConverterHub';
 import { PythonStudioModal } from './components/PythonStudioModal';
 import { VaultModal } from './components/VaultModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -152,12 +153,36 @@ export default function App() {
                   onChange={(e) => handleSelectTool(e.target.value as ToolId)}
                   className="text-xs py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
                 >
-                  <option value="reserved-python">🔒 Area Riservata Python</option>
-                  {PDF_TOOLS.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title}
-                    </option>
-                  ))}
+                  <optgroup label="⚡ Task PDF (100% Locale & Riservato)">
+                    <option value="merge">Unisci PDF</option>
+                    <option value="split">Dividi & Ritaglia</option>
+                    <option value="organize">Tavolo di Montaggio</option>
+                    <option value="rotate">Ruota Pagine</option>
+                    <option value="edit-pdf">Modifica & Firme</option>
+                    <option value="watermark">Filigrana Diagonale</option>
+                    <option value="page-numbers">Numerazione Pagine</option>
+                    <option value="compress">Comprimi PDF</option>
+                    <option value="protect">Proteggi con Password</option>
+                    <option value="ocr-pdf">OCR Tesseract (Locale)</option>
+                    <option value="extract-text">Estrai Testo Puro</option>
+                    <option value="pdf-to-images">PDF in Immagini (JPG/PNG)</option>
+                    <option value="images-to-pdf">Immagini in PDF</option>
+                    <option value="grayscale">Scala di Grigi</option>
+                    <option value="flatten">Appiattisci Moduli</option>
+                    <option value="repair">Ripara PDF</option>
+                  </optgroup>
+                  <optgroup label="🔄 Convertitori Formati (FreeConvert API & Desktop)">
+                    <option value="pdf-to-docx">🌟 PDF in Word (.docx)</option>
+                    <option value="docx-to-pdf">🌟 Word (.docx) in PDF</option>
+                    <option value="pdf-to-xlsx">🌟 PDF in Excel (.xlsx)</option>
+                    <option value="xlsx-to-pdf">🌟 Excel (.xlsx) in PDF</option>
+                    <option value="pdf-to-markdown">PDF in Markdown (.md)</option>
+                    <option value="local-top-converter">🖥️ Conversione Top Locale (Batch Word)</option>
+                    <option value="cloud-converter">☁️ Cloud Converter Universale (FreeConvert)</option>
+                  </optgroup>
+                  <optgroup label="🔒 Sviluppatore">
+                    <option value="reserved-python">🔒 Area Riservata Python & Build .exe</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -217,6 +242,7 @@ export default function App() {
                 <DocxToPdfTool
                   onSuccess={refreshVaultStats}
                   onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
+                  onSwitchToCloudConverter={() => setSelectedToolId('cloud-converter')}
                 />
               )}
               {selectedToolId === 'pdf-to-xlsx' && (
@@ -236,6 +262,13 @@ export default function App() {
               )}
               {selectedToolId === 'images-to-pdf' && (
                 <ImagesToPdfTool onSuccess={refreshVaultStats} />
+              )}
+              {selectedToolId === 'local-top-converter' && (
+                <LocalTopConverterHub
+                  onSuccess={refreshVaultStats}
+                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
+                  onSwitchToCloudConverter={() => setSelectedToolId('cloud-converter')}
+                />
               )}
               {selectedToolId === 'cloud-converter' && (
                 <CloudConverterTool

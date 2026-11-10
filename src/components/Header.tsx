@@ -12,6 +12,7 @@ import {
   Cpu,
   Lock,
   PenTool,
+  Zap,
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import type { ToolId } from '../types/pdf';
@@ -60,36 +61,47 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Zone 2: Navigation Links */}
-        <nav className="hidden md:flex items-center gap-5 text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">
+        {/* Zone 2: Navigation Links (The 4 Pillars) */}
+        <nav className="hidden md:flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">
           <button
             onClick={() => onSelectTool('merge')}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
+            title="Tutti i task e manipolazioni PDF in locale"
           >
-            Strumenti
+            <Zap className="w-3.5 h-3.5 text-rose-500" />
+            <span>Task PDF Locale</span>
           </button>
+
           <button
-            onClick={() => onSelectTool('edit-pdf')}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold"
+            onClick={() => onSelectTool('local-top-converter')}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer whitespace-nowrap"
+            title="Conversione Word/Excel a fedeltà 100% con motore nativo"
           >
-            <PenTool className="w-3.5 h-3.5" />
-            <span>Modifica PDF</span>
+            <Cpu className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Conversione Top Locale</span>
           </button>
+
           <button
-            onClick={() => onSelectTool('ocr-pdf')}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+            onClick={() => onSelectTool('cloud-converter')}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer whitespace-nowrap"
+            title="Conversione universale in Cloud con la tua FreeConvert API Key"
           >
-            Motore OCR
+            <Cloud className="w-3.5 h-3.5 text-sky-500" />
+            <span>Cloud Converter (API)</span>
           </button>
+
           <button
-            onClick={() => onSelectTool('organize')}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+            onClick={onOpenVault}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
+            title="Archivio locale dei file elaborati"
           >
-            Tavolo Montaggio
+            <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+            <span>Vault ({vaultCount})</span>
           </button>
+
           <button
             onClick={() => onSelectTool('reserved-python')}
-            className="px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 shadow-2xs"
+            className="px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 shadow-2xs ml-1"
             title="Area Riservata Sviluppatore (Codice Python e build .exe)"
           >
             <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
