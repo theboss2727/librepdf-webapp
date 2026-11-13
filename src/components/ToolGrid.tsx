@@ -11,7 +11,6 @@ import {
   Images,
   Minimize2,
   Lock,
-  Terminal,
   Database,
   ScanText,
   FileCode2,
@@ -20,343 +19,298 @@ import {
   Table,
   Search,
   ArrowRight,
-  List,
-  Grid,
   SunMedium,
   Layers,
   Wrench,
   PenTool,
   Cloud,
   Cpu,
-  Monitor,
-  Sparkles,
   Zap,
+  Sparkles,
 } from 'lucide-react';
-import { PDF_TOOLS } from '../config/tools';
-import type { ToolId, ToolCategory } from '../types/pdf';
+import type { ToolId } from '../types/pdf';
 
 interface ToolGridProps {
   onSelectTool: (id: ToolId) => void;
   selectedToolId: ToolId | null;
 }
 
-const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
-  Files,
-  Scissors,
-  LayoutGrid,
-  RotateCw,
-  PenTool,
-  Stamp,
-  Hash,
-  FileText,
-  FileCode,
-  FileSpreadsheet,
-  Table,
-  Image: ImageIcon,
-  Images,
-  Minimize2,
-  Lock,
-  Terminal,
-  Database,
-  ScanText,
-  FileCode2,
-  SunMedium,
-  Layers,
-  Wrench,
-  Cloud,
-  Cpu,
-  Monitor,
-};
+interface GroupedItem {
+  id: ToolId;
+  title: string;
+  subtitle: string;
+  icon: React.FC<{ className?: string }>;
+  iconColor: string;
+  badge?: string;
+}
 
-const TOOL_COLOR_STYLES: Record<string, string> = {
-  'local-top-converter': 'bg-indigo-50 text-indigo-600 border-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900/40',
-  'cloud-converter': 'bg-sky-50 text-sky-600 border-sky-200/80 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-900/40',
-  merge: 'bg-rose-50 text-rose-600 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40',
-  split: 'bg-amber-50 text-amber-600 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40',
-  'edit-pdf': 'bg-amber-50 text-amber-600 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/40',
-  watermark: 'bg-emerald-50 text-emerald-600 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40',
-  'page-numbers': 'bg-indigo-50 text-indigo-600 border-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900/40',
-  rotate: 'bg-sky-50 text-sky-600 border-sky-200/80 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-900/40',
-  organize: 'bg-purple-50 text-purple-600 border-purple-200/80 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-900/40',
-  'ocr-pdf': 'bg-blue-50 text-blue-600 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40',
-  'pdf-to-docx': 'bg-blue-50 text-blue-600 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40',
-  'docx-to-pdf': 'bg-indigo-50 text-indigo-600 border-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900/40',
-  'pdf-to-xlsx': 'bg-emerald-50 text-emerald-600 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40',
-  'xlsx-to-pdf': 'bg-teal-50 text-teal-600 border-teal-200/80 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-900/40',
-  'extract-text': 'bg-teal-50 text-teal-600 border-teal-200/80 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-900/40',
-  'pdf-to-markdown': 'bg-violet-50 text-violet-600 border-violet-200/80 dark:bg-violet-950/40 dark:text-violet-400 dark:border-violet-900/40',
-  'pdf-to-images': 'bg-orange-50 text-orange-600 border-orange-200/80 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/40',
-  'images-to-pdf': 'bg-pink-50 text-pink-600 border-pink-200/80 dark:bg-pink-950/40 dark:text-pink-400 dark:border-pink-900/40',
-  compress: 'bg-cyan-50 text-cyan-600 border-cyan-200/80 dark:bg-cyan-950/40 dark:text-cyan-400 dark:border-cyan-900/40',
-  protect: 'bg-red-50 text-red-600 border-red-200/80 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/40',
-  grayscale: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
-  flatten: 'bg-blue-50 text-blue-600 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/40',
-  repair: 'bg-emerald-50 text-emerald-600 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40',
-  vault: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
-  'python-studio': 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40',
-};
+const PDF_ORGANIZE_ITEMS: GroupedItem[] = [
+  { id: 'merge', title: 'Unisci PDF', subtitle: 'Combina più PDF in uno', icon: Files, iconColor: 'text-rose-500' },
+  { id: 'split', title: 'Dividi & Ritaglia', subtitle: 'Estrai pagine o intervalli', icon: Scissors, iconColor: 'text-amber-500' },
+  { id: 'organize', title: 'Tavolo di Montaggio', subtitle: 'Riordina ed elimina pagine', icon: LayoutGrid, iconColor: 'text-purple-500' },
+  { id: 'rotate', title: 'Ruota Pagine', subtitle: 'Orientamento 90° / 180°', icon: RotateCw, iconColor: 'text-sky-500' },
+];
+
+const PDF_EDIT_SECURITY_ITEMS: GroupedItem[] = [
+  { id: 'edit-pdf', title: 'Modifica & Firme PDF', subtitle: 'Testi, timbri e firma a mano', icon: PenTool, iconColor: 'text-rose-600' },
+  { id: 'watermark', title: 'Filigrana Diagonale', subtitle: 'Timbro di riservatezza 45°', icon: Stamp, iconColor: 'text-emerald-500' },
+  { id: 'page-numbers', title: 'Numerazione Pagine', subtitle: 'Inserisci numeri di pagina', icon: Hash, iconColor: 'text-indigo-500' },
+  { id: 'flatten', title: 'Appiattisci Moduli', subtitle: 'Consolida firme e campi form', icon: Layers, iconColor: 'text-blue-500' },
+  { id: 'compress', title: 'Comprimi PDF', subtitle: 'Riduci peso del documento', icon: Minimize2, iconColor: 'text-cyan-500' },
+  { id: 'protect', title: 'Proteggi con Password', subtitle: 'Cifratura locale standard', icon: Lock, iconColor: 'text-red-500' },
+];
+
+const PDF_EXTRACT_MEDIA_ITEMS: GroupedItem[] = [
+  { id: 'ocr-pdf', title: 'OCR Tesseract (Locale)', subtitle: 'Testo da scansioni e foto', icon: ScanText, iconColor: 'text-blue-500' },
+  { id: 'pdf-to-images', title: 'PDF in Immagini (JPG/PNG)', subtitle: 'Esporta pagine ad alta DPI', icon: ImageIcon, iconColor: 'text-orange-500' },
+  { id: 'images-to-pdf', title: 'Immagini in PDF', subtitle: 'Unisci foto JPG/PNG in PDF', icon: Images, iconColor: 'text-pink-500' },
+  { id: 'extract-text', title: 'Estrai Testo Puro', subtitle: 'Testo vettoriale e metadati', icon: FileText, iconColor: 'text-teal-500' },
+  { id: 'pdf-to-markdown', title: 'PDF in Markdown / HTML', subtitle: 'Esporta per editor e web', icon: FileCode2, iconColor: 'text-violet-500' },
+  { id: 'grayscale', title: 'Scala di Grigi', subtitle: 'Conversione stampa B/N', icon: SunMedium, iconColor: 'text-slate-500' },
+  { id: 'repair', title: 'Ripara Struttura XRef', subtitle: 'Recupera PDF danneggiati', icon: Wrench, iconColor: 'text-emerald-600' },
+];
+
+const CONVERSION_TOP_ITEMS: GroupedItem[] = [
+  {
+    id: 'cloud-converter',
+    title: 'Cloud Converter Universale',
+    subtitle: 'Pages, Word, Excel, PPTX, HEIC e oltre 1500 formati 1:1',
+    icon: Cloud,
+    iconColor: 'text-sky-500',
+    badge: '1500+ Formati',
+  },
+  {
+    id: 'pdf-to-docx',
+    title: 'PDF in Word (.docx)',
+    subtitle: 'Layout, colonne, tabelle e stili fedeli 1:1 pronti da modificare',
+    icon: FileText,
+    iconColor: 'text-blue-500',
+    badge: 'Alta Qualità',
+  },
+  {
+    id: 'docx-to-pdf',
+    title: 'Word (.docx, .doc) & Pages in PDF',
+    subtitle: 'Impaginazione e font identici al documento originale',
+    icon: FileCode,
+    iconColor: 'text-indigo-500',
+    badge: 'Alta Qualità',
+  },
+  {
+    id: 'pdf-to-xlsx',
+    title: 'PDF in Excel (.xlsx)',
+    subtitle: 'Estrazione precisa di tabelle, celle e colonne in Excel',
+    icon: FileSpreadsheet,
+    iconColor: 'text-emerald-500',
+    badge: 'Alta Qualità',
+  },
+  {
+    id: 'xlsx-to-pdf',
+    title: 'Excel (.xlsx, .xls, .csv) in PDF',
+    subtitle: 'Stampa vettoriale fedele 1:1 senza tagli o sovrapposizioni',
+    icon: Table,
+    iconColor: 'text-teal-500',
+    badge: 'Alta Qualità',
+  },
+];
 
 export const ToolGrid: React.FC<ToolGridProps> = ({
   onSelectTool,
   selectedToolId,
 }) => {
-  const [activeCategory, setActiveCategory] = useState<ToolCategory>('all');
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid');
 
-  const categories: { id: ToolCategory; label: string }[] = [
-    { id: 'all', label: 'Tutti i Moduli' },
-    { id: 'organize', label: '⚡ Task PDF (Locale)' },
-    { id: 'convert', label: '🔄 Convertitori Formati' },
-    { id: 'edit', label: '✏️ Modifica & Firme' },
-    { id: 'security', label: '🔒 Sicurezza & OCR' },
-  ];
+  const filterFn = (item: GroupedItem) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return item.title.toLowerCase().includes(q) || item.subtitle.toLowerCase().includes(q);
+  };
 
-  const filteredTools = PDF_TOOLS.filter((tool) => {
-    const matchesCategory =
-      activeCategory === 'all' || tool.category === activeCategory;
-    const matchesSearch =
-      tool.title.toLowerCase().includes(search.toLowerCase()) ||
-      tool.description.toLowerCase().includes(search.toLowerCase()) ||
-      tool.subtitle.toLowerCase().includes(search.toLowerCase()) ||
-      (tool.technicalSpec && tool.technicalSpec.toLowerCase().includes(search.toLowerCase()));
-    return matchesCategory && matchesSearch;
-  });
+  const renderRow = (item: GroupedItem) => {
+    const isSelected = selectedToolId === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => onSelectTool(item.id)}
+        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border text-left transition-all cursor-pointer group ${
+          isSelected
+            ? 'border-rose-400 bg-rose-50/70 dark:bg-rose-950/30 shadow-2xs'
+            : 'border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-2xs'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center shrink-0">
+            <item.icon className={`w-4 h-4 ${item.iconColor}`} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                {item.title}
+              </span>
+              {item.badge && (
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-100/80 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 shrink-0">
+                  {item.badge}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              {item.subtitle}
+            </p>
+          </div>
+        </div>
+        <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 group-hover:translate-x-0.5 transition-all shrink-0" />
+      </button>
+    );
+  };
+
+  const orgFiltered = PDF_ORGANIZE_ITEMS.filter(filterFn);
+  const editFiltered = PDF_EDIT_SECURITY_ITEMS.filter(filterFn);
+  const mediaFiltered = PDF_EXTRACT_MEDIA_ITEMS.filter(filterFn);
+  const convFiltered = CONVERSION_TOP_ITEMS.filter(filterFn);
+
+  const hasPdfResults = orgFiltered.length > 0 || editFiltered.length > 0 || mediaFiltered.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* 3 Macro-Sections Architecture Cards (The 3 Pillars) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {/* Card 1: Task PDF Locale */}
-        <div
-          onClick={() => {
-            setActiveCategory('organize');
-            setSearch('');
-          }}
-          className={`p-4.5 rounded-2xl border transition-all cursor-pointer group ${
-            activeCategory === 'organize'
-              ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/60 shadow-xs ring-1 ring-rose-400/30'
-              : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 hover:border-rose-300 shadow-2xs hover:shadow-xs'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300">
-              <Zap className="w-3 h-3" />
-              100% LOCALE & PRIVACY
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono">Zero Upload</span>
-          </div>
-          <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-rose-600 transition-colors">
-            1. Task & Modifica PDF
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-            Unisci, dividi, firma, ruota, filigrana, comprimi e OCR. Velocità istantanea senza limiti di dimensione file.
-          </p>
+      {/* Simple Filter Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          Tutte le funzioni sono raggruppate per tipologia ed esecuzione garantita.
         </div>
-
-        {/* Card 2: Conversione Top Locale */}
-        <div
-          onClick={() => onSelectTool('local-top-converter')}
-          className="p-4.5 rounded-2xl border transition-all cursor-pointer group bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 hover:border-indigo-400 shadow-2xs hover:shadow-xs hover:-translate-y-0.5"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
-              <Cpu className="w-3 h-3" />
-              TOP FEDELTÀ NATIVA
-            </span>
-            <span className="text-[10px] text-indigo-500 font-mono">100% Word</span>
-          </div>
-          <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">
-            2. Conversione Top Locale
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-            Motore di sistema Word/LibreOffice sul tuo PC. Layout identico al 100%, batch per intere cartelle, zero cloud.
-          </p>
-        </div>
-
-        {/* Card 3: Conversione Cloud Top */}
-        <div
-          onClick={() => onSelectTool('cloud-converter')}
-          className="p-4.5 rounded-2xl border transition-all cursor-pointer group bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 hover:border-sky-400 shadow-2xs hover:shadow-xs hover:-translate-y-0.5"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
-              <Cloud className="w-3 h-3" />
-              FREECONVERT API
-            </span>
-            <span className="text-[10px] text-sky-500 font-mono">750 Crediti/m</span>
-          </div>
-          <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-sky-600 transition-colors">
-            3. Conversione Cloud Top
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-            Motore Cloud per Apple Pages, DOCX, DOC legacy, PPTX, XLSX. Layout perfetto 1:1 con la tua API Key personale.
-          </p>
+        <div className="relative w-full sm:w-72">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Cerca modulo (es. unisci, word, ocr)..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-8.5 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:border-slate-400 dark:focus:border-slate-600 shadow-2xs"
+          />
         </div>
       </div>
 
-      {/* Control Bar: Categories + View Switcher + Search */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-1">
-        {/* Category Segmented Control */}
-        <div className="flex items-center gap-1 overflow-x-auto max-w-full p-1 rounded-xl bg-slate-200/70 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap cursor-pointer ${
-                activeCategory === cat.id
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {/* View mode toggle + Quick filter */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Filtra moduli per nome o specifica..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8.5 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:border-slate-400 dark:focus:border-slate-600 shadow-2xs"
-            />
+      {/* GROUP 1: Conversioni Alta Qualità (Solo Top Fidelity) */}
+      {convFiltered.length > 0 && (
+        <section className="rounded-2xl border border-sky-200/80 dark:border-sky-900/50 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-200/70 dark:border-sky-800">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                  1. Conversioni Documenti (Solo Alta Qualità 1:1)
+                </h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Tutte le conversioni vengono eseguite automaticamente con motori ad alta fedeltà 1:1.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center p-1 rounded-xl bg-slate-200/70 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shrink-0">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-lg transition cursor-pointer ${
-                viewMode === 'grid'
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-              title="Vista Griglia"
-            >
-              <Grid className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode('compact')}
-              className={`p-1.5 rounded-lg transition cursor-pointer ${
-                viewMode === 'compact'
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-              title="Vista Compatta"
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {convFiltered.map(renderRow)}
           </div>
-        </div>
-      </div>
+        </section>
+      )}
 
-      {/* Grid or Compact View */}
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-          {filteredTools.map((tool) => {
-            const IconComp = ICON_MAP[tool.iconName] || Files;
-            const isSelected = selectedToolId === tool.id;
-            const colorClass = TOOL_COLOR_STYLES[tool.id] || 'bg-slate-100 text-slate-700 border-slate-200';
+      {/* GROUP 2: Task PDF Locali (100% Privacy & Istantanei) */}
+      {hasPdfResults && (
+        <section className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-200/70 dark:border-rose-800">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                  2. Task PDF Locali (100% Privacy & Zero Limiti)
+                </h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Manipolazione nativa ad alte prestazioni sul tuo dispositivo: nessun upload e nessun limite di peso file.
+                </p>
+              </div>
+            </div>
+          </div>
 
-            return (
-              <div
-                key={tool.id}
-                onClick={() => onSelectTool(tool.id)}
-                className={`relative flex flex-col justify-between p-4.5 rounded-2xl border transition-all cursor-pointer group bg-white dark:bg-slate-900 ${
-                  isSelected
-                    ? 'border-rose-500 ring-2 ring-rose-500/20 shadow-md'
-                    : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs hover:shadow-md hover:-translate-y-0.5'
-                }`}
-              >
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Sub-Group A: Organizza Pagine */}
+            {orgFiltered.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-[11px] font-mono uppercase tracking-wider font-bold text-slate-400 px-1">
+                  Organizza Flussi
+                </h3>
+                <div className="space-y-2">{orgFiltered.map(renderRow)}</div>
+              </div>
+            )}
+
+            {/* Sub-Group B: Modifica & Sicurezza */}
+            {editFiltered.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-[11px] font-mono uppercase tracking-wider font-bold text-slate-400 px-1">
+                  Modifica, Firme & Sicurezza
+                </h3>
+                <div className="space-y-2">{editFiltered.map(renderRow)}</div>
+              </div>
+            )}
+
+            {/* Sub-Group C: OCR, Testo & Immagini */}
+            {mediaFiltered.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-[11px] font-mono uppercase tracking-wider font-bold text-slate-400 px-1">
+                  OCR, Testo & Immagini
+                </h3>
+                <div className="space-y-2">{mediaFiltered.map(renderRow)}</div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* GROUP 3: Archivio & Strumenti Sviluppatore */}
+      {!search.trim() && (
+        <section className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              onClick={() => onSelectTool('vault')}
+              className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition cursor-pointer group text-left shadow-2xs"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
+                  <Database className="w-4 h-4" />
+                </div>
                 <div>
-                  {/* Card Header: Icon + Technical Tag */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-transform group-hover:scale-105 shadow-2xs ${colorClass}`}>
-                      <IconComp className="w-4.5 h-4.5" />
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {tool.shortcutKey && (
-                        <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                          {tool.shortcutKey}
-                        </span>
-                      )}
-                      {tool.badge && (
-                        <span className="text-[10px] font-mono font-medium text-slate-500 dark:text-slate-400">
-                          {tool.badge}
-                        </span>
-                      )}
-                    </div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    Vault Locale (Archivio IndexedDB)
                   </div>
-
-                  {/* Title & Subtitle */}
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
-                    {tool.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 font-medium">
-                    {tool.subtitle}
-                  </p>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
-                    {tool.description}
-                  </p>
-                </div>
-
-                {/* Card Footer: Spec string + Subtle Arrow */}
-                <div className="flex items-center justify-between pt-3.5 mt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] font-mono text-slate-400">
-                  <span className="truncate pr-2 font-medium">{tool.technicalSpec || 'Wasm Pipeline'}</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 group-hover:translate-x-1 transition-all shrink-0" />
+                  <div className="text-[11px] text-slate-500">
+                    Recupera o riscarica tutti i file elaborati in precedenza
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* Compact List View */
-        <div className="divide-y divide-slate-200/80 dark:divide-slate-800 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
-          {filteredTools.map((tool) => {
-            const IconComp = ICON_MAP[tool.iconName] || Files;
-            const colorClass = TOOL_COLOR_STYLES[tool.id] || 'bg-slate-100 text-slate-700 border-slate-200';
-            return (
-              <div
-                key={tool.id}
-                onClick={() => onSelectTool(tool.id)}
-                className="flex items-center justify-between p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/80 cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center gap-3 min-w-0 pr-3">
-                  <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${colorClass}`}>
-                    <IconComp className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-rose-600 transition-colors">
-                        {tool.title}
-                      </span>
-                      {tool.badge && (
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {tool.badge}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-500 truncate">
-                      {tool.subtitle}
-                    </p>
-                  </div>
-                </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
+            </button>
 
-                <div className="flex items-center gap-4 shrink-0">
-                  <span className="hidden md:inline font-mono text-[10px] text-slate-400">
-                    {tool.technicalSpec}
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600 dark:group-hover:text-white group-hover:translate-x-1 transition-all" />
+            <button
+              onClick={() => onSelectTool('reserved-python')}
+              className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/40 hover:border-amber-400 transition cursor-pointer group text-left shadow-2xs"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    Area Riservata Python & Build .exe
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Sorgenti desktop PyQt6 + PyMuPDF protetti da PIN
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              <ArrowRight className="w-3.5 h-3.5 text-amber-500 group-hover:translate-x-0.5 transition" />
+            </button>
+          </div>
+        </section>
       )}
     </div>
   );

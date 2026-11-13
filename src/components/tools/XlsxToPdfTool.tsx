@@ -1,68 +1,103 @@
-import React, { useState } from 'react';
-import { Table, Download, CheckCircle2, Loader2, ArrowRight, Code2, Compass } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Table,
+  Download,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  Key,
+  Check,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  AlertTriangle,
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
-import { convertXlsxToPdf } from '../../services/officeConverters';
+import { getStoredApiKey, setStoredApiKey } from '../../services/freeConvertApi';
+import { convertHighFidelity, getEngineCapabilities } from '../../services/highFidelityConverter';
 import { saveToVault } from '../../services/storageVault';
 
 interface XlsxToPdfToolProps {
   onSuccess: () => void;
-  onOpenPythonStudio?: () => void;
 }
 
-export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({
-  onSuccess,
-  onOpenPythonStudio,
-}) => {
+export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({ onSuccess }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isKeySaved, setIsKeySaved] = useState(false);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [hasSilentEngine, setHasSilentEngine] = useState(false);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('');
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
   const [outputName, setOutputName] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fileItem = files[0];
 
+  useEffect(() => {
+    const saved = getStoredApiKey();
+    if (saved) {
+      setApiKey(saved);
+      setIsKeySaved(true);
+    }
+
+    getEngineCapabilities().then((caps) => {
+      const autoReady = caps.officeToPdf || caps.hasServerFreeConvertKey;
+      setHasSilentEngine(autoReady);
+      if (!autoReady && !saved) {
+        setShowKeyInput(true);
+      }
+    });
+  }, []);
+
+  const handleSaveApiKey = () => {
+    setStoredApiKey(apiKey);
+    setIsKeySaved(!!apiKey.trim());
+    if (apiKey.trim()) {
+      setShowKeyInput(false);
+      setErrorMsg(null);
+    }
+  };
+
   const handleConvert = async () => {
     if (!fileItem) return;
+    setErrorMsg(null);
     setIsProcessing(true);
     setProgress(10);
-    setStatusMsg('Lettura fogli di calcolo...');
 
     try {
-      const buffer = await fileItem.file.arrayBuffer();
-      const pdfBytes = await convertXlsxToPdf(
-        buffer,
-        { orientation },
-        (pct, msg) => {
-          setProgress(pct);
-          setStatusMsg(msg);
-        }
-      );
+      const result = await convertHighFidelity(fileItem.file, 'pdf', apiKey, (pct, msg) => {
+        setProgress(pct);
+        setStatusMsg(msg);
+      });
 
-      const baseName = fileItem.file.name.replace(/\.(xlsx|xls|csv)$/i, '');
-      const pdfName = `${baseName}.pdf`;
-      setOutputName(pdfName);
-
-      const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setResultBytes(blob.size);
+      setOutputName(result.outputFilename);
+      setDownloadUrl(result.downloadUrl);
+      setResultBytes(result.resultBlob.size);
 
       await saveToVault({
         toolId: 'xlsx-to-pdf',
-        name: pdfName,
+        name: result.outputFilename,
         originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
+        resultSize: result.resultBlob.size,
+        data: result.resultBlob,
       });
 
       onSuccess();
       confetti({ particleCount: 50, spread: 55 });
     } catch (err: any) {
-      alert(`Errore conversione Excel in PDF: ${err.message}`);
+      if (err.message === 'NEED_API_KEY') {
+        setShowKeyInput(true);
+        setErrorMsg('Inserisci la tua API Key di FreeConvert qui sopra per avviare la conversione 1:1.');
+      } else {
+        setErrorMsg(err.message || 'Errore durante la conversione Excel in PDF.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -75,10 +110,11 @@ export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({
     setFiles([]);
     setProgress(0);
     setStatusMsg('');
+    setErrorMsg(null);
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3">
@@ -91,15 +127,81 @@ export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({
                 Excel (.xlsx, .xls, .csv) in PDF
               </h2>
               <span className="font-mono text-[10px] text-teal-600 bg-teal-50 dark:bg-teal-950/50 dark:text-teal-300 px-2 py-0.5 rounded border border-teal-200 dark:border-teal-900/60">
-                Auto-fit Vector Grid
+                Alta Fedeltà 1:1
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Trasforma tabelle e fogli Excel in documenti PDF eleganti con intestazioni a contrasto, righe alternate e impaginazione automatica.
+              Mantiene colori, grafici, bordi e formattazione esatta delle celle senza tagli.
             </p>
           </div>
         </div>
       </div>
+
+      {(!hasSilentEngine || showKeyInput) && (
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-sky-500" />
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                Motore Alta Fedeltà (FreeConvert)
+              </span>
+              {isKeySaved && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                  <Check className="w-3 h-3" /> Attivo
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setShowKeyInput(!showKeyInput)}
+              className="text-xs text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+            >
+              {showKeyInput ? 'Nascondi' : 'Configura chiave API'}
+            </button>
+          </div>
+
+          {showKeyInput && (
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Inserisci una volta la tua API Key gratuita di FreeConvert (750 conversioni/mese).
+              </p>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    placeholder="Incolla qui la tua API Key di FreeConvert..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="w-full px-3 py-2 pr-10 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-hidden focus:border-sky-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveApiKey}
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold cursor-pointer transition shadow-xs"
+                >
+                  Salva
+                </button>
+              </div>
+              <a
+                href="https://www.freeconvert.com/api"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 hover:underline"
+              >
+                <span>Ottieni gratis la tua API Key su FreeConvert</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+        </div>
+      )}
 
       {downloadUrl ? (
         <div className="text-center py-8 space-y-5 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200 dark:border-emerald-800 p-6 sm:p-8">
@@ -111,10 +213,9 @@ export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({
               PDF da Foglio Excel Generato con Successo!
             </h3>
             <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
-              Impaginazione orizzontale ottimizzata con divisione automatica delle pagine per elenchi lunghi.
+              Formattazione, colori e impaginazione mantenuti al 100%.
             </p>
           </div>
-
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <a
               href={downloadUrl}
@@ -128,77 +229,43 @@ export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({
               onClick={handleReset}
               className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer shadow-2xs"
             >
-              Converti un altro file Excel
+              Converti altro file Excel
             </button>
           </div>
-
-          {onOpenPythonStudio && (
-            <div className="pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60">
-              <button
-                onClick={onOpenPythonStudio}
-                className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-600 dark:text-slate-300 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer"
-              >
-                <Code2 className="w-3.5 h-3.5 text-teal-500" />
-                <span>Visualizza codice Python / PyMuPDF per questo modulo</span>
-              </button>
-            </div>
-          )}
         </div>
       ) : (
         <>
           <FileDropzone
             files={files}
             onFilesChange={setFiles}
-            accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            accept=".xlsx,.xls,.csv,.numbers,.ods"
             multiple={false}
-            title="Trascina qui il file Excel (.xlsx, .xls o .csv) da convertire in PDF"
-            subtitle="I dati vengono analizzati localmente ed esportati in griglia PDF A4."
+            title="Trascina qui il file Excel (.xlsx, .xls, .csv) o Numbers da convertire in PDF"
+            subtitle="Stampa vettoriale fedele 1:1 senza tagli."
           />
 
           {fileItem && (
             <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Orientamento di Stampa PDF:
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setOrientation('landscape')}
-                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                      orientation === 'landscape'
-                        ? 'border-teal-500 ring-2 ring-teal-500/20 bg-teal-50/50 dark:bg-teal-950/20'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                      <span>Orizzontale (Landscape)</span>
-                      <span className="font-mono text-[10px] bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-300 px-1.5 py-0.2 rounded">Consigliato</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1">Massima larghezza per ospitare molte colonne senza sovrapposizioni.</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOrientation('portrait')}
-                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                      orientation === 'portrait'
-                        ? 'border-teal-500 ring-2 ring-teal-500/20 bg-teal-50/50 dark:bg-teal-950/20'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                      Verticale (Portrait)
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1">Ideale per tabelle strette con poche colonne e molte righe.</p>
-                  </button>
-                </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  File selezionato: <strong>{fileItem.file.name}</strong>
+                </span>
+                <span className="text-[11px] font-mono text-slate-500">
+                  {(fileItem.file.size / 1024).toFixed(1)} KB
+                </span>
               </div>
+
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
 
               {isProcessing && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 font-mono">
-                    <span>{statusMsg || 'Composizione tabella PDF...'}</span>
+                    <span>{statusMsg || 'Conversione in corso...'}</span>
                     <span>{progress}%</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
@@ -223,7 +290,7 @@ export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
-                      <span>Generazione PDF in corso...</span>
+                      <span>Conversione in corso...</span>
                     </>
                   ) : (
                     <>

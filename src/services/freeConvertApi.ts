@@ -325,24 +325,30 @@ export async function convertFileWithFreeConvert(
   }
 
   const cleanKey = apiKey.trim();
+  const useServerKey = cleanKey === '__SERVER_PROVIDED__';
   const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
   const outputFilename = `${baseName}.${targetFormat.toLowerCase()}`;
 
-  onProgress?.(10, 'Inizializzazione sessione di conversione su FreeConvert...');
+  onProgress?.(10, 'Inizializzazione sessione di conversione...');
 
-  // Try local / Netlify proxy first, fallback to direct API
-  const endpoints = ['/api/freeconvert/v1/process/jobs', 'https://api.freeconvert.com/v1/process/jobs'];
+  // Try local proxy first, fallback to direct API
+  const endpoints = useServerKey
+    ? ['/api/freeconvert/v1/process/jobs']
+    : ['/api/freeconvert/v1/process/jobs', 'https://api.freeconvert.com/v1/process/jobs'];
   let jobData: any = null;
   let activeApiBase = '';
 
   for (const endpoint of endpoints) {
     try {
+      const reqHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (!useServerKey) {
+        reqHeaders.Authorization = `Bearer ${cleanKey}`;
+      }
       const resp = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${cleanKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: reqHeaders,
         body: JSON.stringify({
           tasks: {
             'import-file': {
@@ -434,10 +440,12 @@ export async function convertFileWithFreeConvert(
     await new Promise((r) => setTimeout(r, 1500));
 
     try {
+      const pollHeaders: Record<string, string> = {};
+      if (!useServerKey) {
+        pollHeaders.Authorization = `Bearer ${cleanKey}`;
+      }
       const pollRes = await fetch(pollUrl, {
-        headers: {
-          Authorization: `Bearer ${cleanKey}`,
-        },
+        headers: pollHeaders,
       });
 
       if (!pollRes.ok) continue;

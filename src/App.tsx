@@ -42,7 +42,6 @@ import { DocxToPdfTool } from './components/tools/DocxToPdfTool';
 import { PdfToXlsxTool } from './components/tools/PdfToXlsxTool';
 import { XlsxToPdfTool } from './components/tools/XlsxToPdfTool';
 import { CloudConverterTool } from './components/tools/CloudConverterTool';
-import { LocalTopConverterHub } from './components/LocalTopConverterHub';
 import { PythonStudioModal } from './components/PythonStudioModal';
 import { VaultModal } from './components/VaultModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -111,6 +110,8 @@ export default function App() {
         onOpenVault={() => setIsVaultOpen(true)}
         onOpenPythonStudio={() => handleSelectTool('reserved-python')}
         onSelectTool={handleSelectTool}
+        onGoHome={() => setSelectedToolId(null)}
+        selectedToolId={selectedToolId}
         vaultCount={vaultCount}
         cloudSyncActive={cloudSyncActive}
         theme={theme}
@@ -119,73 +120,83 @@ export default function App() {
       />
 
       {/* Main Studio Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7 space-y-7">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Always-Visible Navigation & High-Contrast Dropdown Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="flex items-center gap-2 text-xs font-medium">
+            {selectedToolId ? (
+              <>
+                <button
+                  onClick={() => setSelectedToolId(null)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold transition cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Tutti i Gruppi</span>
+                </button>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-bold text-slate-900 dark:text-slate-100">
+                  {selectedToolId === 'reserved-python' ? 'Area Riservata Python 🔒' : selectedToolConfig?.title}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Pannello Principale · Seleziona un gruppo qui sotto o dal menu a tendina →
+              </span>
+            )}
+          </div>
+
+          {/* High-Visibility Dropdown Selector (Always Visible) */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label htmlFor="quick-tool-select" className="text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
+              Menu Rapido:
+            </label>
+            <select
+              id="quick-tool-select"
+              value={selectedToolId || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) setSelectedToolId(null);
+                else handleSelectTool(val as ToolId);
+              }}
+              className="flex-1 sm:w-72 text-xs font-semibold py-2 px-3 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:border-rose-500 cursor-pointer shadow-2xs"
+            >
+              <option value="">🏠 Schermata Principale (Gruppi)</option>
+              <optgroup label="✨ Conversioni Alta Qualità (Solo 1:1)">
+                <option value="cloud-converter">☁️ Cloud Converter Universale (FreeConvert)</option>
+                <option value="pdf-to-docx">📄 PDF in Word (.docx) — Alta Qualità</option>
+                <option value="docx-to-pdf">📝 Word (.docx, .doc) & Pages in PDF</option>
+                <option value="pdf-to-xlsx">📊 PDF in Excel (.xlsx) — Alta Qualità</option>
+                <option value="xlsx-to-pdf">📈 Excel (.xlsx, .xls) in PDF</option>
+              </optgroup>
+              <optgroup label="⚡ Task PDF Locali (100% Privacy)">
+                <option value="merge">Unisci PDF</option>
+                <option value="split">Dividi & Ritaglia</option>
+                <option value="organize">Tavolo di Montaggio</option>
+                <option value="rotate">Ruota Pagine</option>
+                <option value="edit-pdf">Modifica & Firme PDF</option>
+                <option value="watermark">Filigrana Diagonale</option>
+                <option value="page-numbers">Numerazione Pagine</option>
+                <option value="flatten">Appiattisci Moduli</option>
+                <option value="compress">Comprimi PDF</option>
+                <option value="protect">Proteggi con Password</option>
+                <option value="ocr-pdf">OCR Tesseract (Locale)</option>
+                <option value="pdf-to-images">PDF in Immagini (JPG/PNG)</option>
+                <option value="images-to-pdf">Immagini in PDF</option>
+                <option value="extract-text">Estrai Testo Vettoriale</option>
+                <option value="pdf-to-markdown">PDF in Markdown / HTML</option>
+                <option value="grayscale">Scala di Grigi</option>
+                <option value="repair">Ripara Struttura XRef</option>
+              </optgroup>
+              <optgroup label="🔒 Sviluppatore">
+                <option value="reserved-python">🔒 Area Riservata Python & Build .exe</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
         {selectedToolId ? (
           /* Active Workstation Stage */
           <div className="space-y-5 animate-in fade-in">
-            {/* Context Breadcrumb & Quick Switcher */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <div className="flex items-center gap-2 text-xs font-medium">
-                <button
-                  onClick={() => setSelectedToolId(null)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Workstation</span>
-                </button>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-slate-400">Moduli</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                <span className="font-bold text-slate-900 dark:text-slate-100">
-                  {selectedToolId === 'reserved-python' ? 'Area Riservata Sviluppatore 🔒' : selectedToolConfig?.title}
-                </span>
-                {selectedToolConfig?.technicalSpec && (
-                  <span className="hidden md:inline font-mono text-[10px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 ml-2">
-                    {selectedToolConfig.technicalSpec}
-                  </span>
-                )}
-              </div>
-
-              {/* Quick Jump Selector */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedToolId || ''}
-                  onChange={(e) => handleSelectTool(e.target.value as ToolId)}
-                  className="text-xs py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
-                >
-                  <optgroup label="⚡ Task PDF (100% Locale & Riservato)">
-                    <option value="merge">Unisci PDF</option>
-                    <option value="split">Dividi & Ritaglia</option>
-                    <option value="organize">Tavolo di Montaggio</option>
-                    <option value="rotate">Ruota Pagine</option>
-                    <option value="edit-pdf">Modifica & Firme</option>
-                    <option value="watermark">Filigrana Diagonale</option>
-                    <option value="page-numbers">Numerazione Pagine</option>
-                    <option value="compress">Comprimi PDF</option>
-                    <option value="protect">Proteggi con Password</option>
-                    <option value="ocr-pdf">OCR Tesseract (Locale)</option>
-                    <option value="extract-text">Estrai Testo Puro</option>
-                    <option value="pdf-to-images">PDF in Immagini (JPG/PNG)</option>
-                    <option value="images-to-pdf">Immagini in PDF</option>
-                    <option value="grayscale">Scala di Grigi</option>
-                    <option value="flatten">Appiattisci Moduli</option>
-                    <option value="repair">Ripara PDF</option>
-                  </optgroup>
-                  <optgroup label="🔄 Convertitori Formati (FreeConvert API & Desktop)">
-                    <option value="pdf-to-docx">🌟 PDF in Word (.docx)</option>
-                    <option value="docx-to-pdf">🌟 Word (.docx) in PDF</option>
-                    <option value="pdf-to-xlsx">🌟 PDF in Excel (.xlsx)</option>
-                    <option value="xlsx-to-pdf">🌟 Excel (.xlsx) in PDF</option>
-                    <option value="pdf-to-markdown">PDF in Markdown (.md)</option>
-                    <option value="local-top-converter">🖥️ Conversione Top Locale (Batch Word)</option>
-                    <option value="cloud-converter">☁️ Cloud Converter Universale (FreeConvert)</option>
-                  </optgroup>
-                  <optgroup label="🔒 Sviluppatore">
-                    <option value="reserved-python">🔒 Area Riservata Python & Build .exe</option>
-                  </optgroup>
-                </select>
-              </div>
-            </div>
 
             {/* Active Tool Canvas */}
             <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 sm:p-5 shadow-xs">
@@ -233,29 +244,16 @@ export default function App() {
                 <PdfToMarkdownTool onSuccess={refreshVaultStats} />
               )}
               {selectedToolId === 'pdf-to-docx' && (
-                <PdfToDocxTool
-                  onSuccess={refreshVaultStats}
-                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
-                />
+                <PdfToDocxTool onSuccess={refreshVaultStats} />
               )}
               {selectedToolId === 'docx-to-pdf' && (
-                <DocxToPdfTool
-                  onSuccess={refreshVaultStats}
-                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
-                  onSwitchToCloudConverter={() => setSelectedToolId('cloud-converter')}
-                />
+                <DocxToPdfTool onSuccess={refreshVaultStats} />
               )}
               {selectedToolId === 'pdf-to-xlsx' && (
-                <PdfToXlsxTool
-                  onSuccess={refreshVaultStats}
-                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
-                />
+                <PdfToXlsxTool onSuccess={refreshVaultStats} />
               )}
               {selectedToolId === 'xlsx-to-pdf' && (
-                <XlsxToPdfTool
-                  onSuccess={refreshVaultStats}
-                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
-                />
+                <XlsxToPdfTool onSuccess={refreshVaultStats} />
               )}
               {selectedToolId === 'pdf-to-images' && (
                 <PdfToImagesTool onSuccess={refreshVaultStats} />
@@ -263,18 +261,8 @@ export default function App() {
               {selectedToolId === 'images-to-pdf' && (
                 <ImagesToPdfTool onSuccess={refreshVaultStats} />
               )}
-              {selectedToolId === 'local-top-converter' && (
-                <LocalTopConverterHub
-                  onSuccess={refreshVaultStats}
-                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
-                  onSwitchToCloudConverter={() => setSelectedToolId('cloud-converter')}
-                />
-              )}
               {selectedToolId === 'cloud-converter' && (
-                <CloudConverterTool
-                  onSuccess={refreshVaultStats}
-                  onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
-                />
+                <CloudConverterTool onSuccess={refreshVaultStats} />
               )}
               {selectedToolId === 'compress' && (
                 <CompressTool onSuccess={refreshVaultStats} />

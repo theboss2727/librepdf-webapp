@@ -21,7 +21,6 @@ export type ToolId =
   | 'compress'
   | 'protect'
   | 'cloud-converter'
-  | 'local-top-converter'
   | 'python-studio'
   | 'reserved-python'
   | 'vault';
