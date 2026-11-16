@@ -1,18 +1,7 @@
 import { createWorker } from 'tesseract.js';
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsLib } from './pdfjsSetup';
 import { renderPageToImage, getPdfPageCount } from './pdfEngine';
 import type { OcrOptions, OcrPageResult } from '../types/pdf';
-
-// Ensure PDF.js worker is initialized
-if (typeof window !== 'undefined' && pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-  try {
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version || '6.4.299'}/build/pdf.worker.min.mjs`;
-    }
-  } catch {
-    // Ignore fallback
-  }
-}
 
 /**
  * Execute client-side WebAssembly Optical Character Recognition (OCR)

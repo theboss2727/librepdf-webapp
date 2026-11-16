@@ -38,7 +38,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
   files,
   onFilesChange,
   accept,
-  multiple,
+  multiple = true,
   maxFiles = 50,
   title = 'Ingestione File Locale',
   subtitle = 'Trascina qui i tuoi documenti o sfoglia dal filesystem locale. I file non lasciano mai la memoria del dispositivo.',

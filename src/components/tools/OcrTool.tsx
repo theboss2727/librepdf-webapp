@@ -21,7 +21,8 @@ import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { runOcrOnDocument } from '../../services/ocrEngine';
 import { extractTextFromPdf } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
 import type { OcrOptions, OcrPageResult } from '../../types/pdf';
 
 interface OcrToolProps {
@@ -37,7 +38,6 @@ export const OcrTool: React.FC<OcrToolProps> = ({
   const [language, setLanguage] = useState<OcrOptions['language']>('ita');
   const [processAllPages, setProcessAllPages] = useState(true);
   const [maxPagesToOcr, setMaxPagesToOcr] = useState(5);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -58,125 +58,112 @@ export const OcrTool: React.FC<OcrToolProps> = ({
   const [activeTab, setActiveTab] = useState<'all' | number>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'ocr-pdf',
+    onSuccess,
+  });
+
   const fileItem = files[0];
 
   // Quick native text extraction (for digital vector PDFs)
   const handleQuickExtract = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
     setStatusText('Lettura diretta vettoriale del documento...');
     setErrorMsg(null);
     setLivePages([]);
 
-    try {
-      const extracted = await extractTextFromPdf(fileItem.file, (p) => {
-        setPagePercent(p);
-      });
+    await run(async () => {
+      try {
+        const extracted = await extractTextFromPdf(fileItem.file, (p) => {
+          setPagePercent(p);
+        });
 
-      const pagesList: OcrPageResult[] = extracted.pages.map((p) => {
-        const words = p.text ? p.text.split(/\s+/).filter(Boolean).length : 0;
-        return {
-          pageNumber: p.pageNumber,
-          text: p.text,
-          confidence: 99,
-          wordsCount: words,
+        const pagesList: OcrPageResult[] = extracted.pages.map((p) => {
+          const words = p.text ? p.text.split(/\s+/).filter(Boolean).length : 0;
+          return {
+            pageNumber: p.pageNumber,
+            text: p.text,
+            confidence: 99,
+            wordsCount: words,
+          };
+        });
+
+        const results = {
+          fullText: extracted.fullText,
+          pages: pagesList,
+          totalWords: extracted.wordCount,
+          averageConfidence: 99,
         };
-      });
 
-      const results = {
-        fullText: extracted.fullText,
-        pages: pagesList,
-        totalWords: extracted.wordCount,
-        averageConfidence: 99,
-      };
+        setOcrResults(results);
+        setLivePages(pagesList);
 
-      setOcrResults(results);
-      setLivePages(pagesList);
+        const blob = new Blob([results.fullText], { type: 'text/plain;charset=utf-8' });
+        const baseName = fileItem.file.name.replace(/\.[^/.]+$/, '');
+        const outName = `${baseName}_Testo_Nativo.txt`;
 
-      const blob = new Blob([results.fullText], { type: 'text/plain;charset=utf-8' });
-      const baseName = fileItem.file.name.replace(/\.[^/.]+$/, '');
-      const outName = `${baseName}_Testo_Nativo.txt`;
-
-      await saveToVault({
-        toolId: 'ocr-pdf',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
-
-      onSuccess();
-      confetti({ particleCount: 40, spread: 50 });
-    } catch (err: any) {
-      setErrorMsg(`Errore estrazione testo: ${err.message || err}`);
-    } finally {
-      setIsProcessing(false);
-      setStatusText('');
-    }
+        await persist({ name: outName, originalSize: fileItem.file.size, data: blob });
+        confetti({ particleCount: 40, spread: 50 });
+      } catch (err: any) {
+        setErrorMsg(`Errore estrazione testo: ${err.message || err}`);
+      }
+    });
+    setStatusText('');
   };
 
   // Full neural WebAssembly OCR
   const handleRunOcr = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
     setStatusText('Inizializzazione motore OCR WebAssembly SIMD...');
     setPagePercent(5);
     setErrorMsg(null);
     setLivePages([]);
 
-    try {
-      const pageScope = processAllPages
-        ? 'all'
-        : Array.from(
-            { length: Math.min(maxPagesToOcr, fileItem.pageCount || 1) },
-            (_, i) => i + 1
-          );
+    await run(async () => {
+      try {
+        const pageScope = processAllPages
+          ? 'all'
+          : Array.from(
+              { length: Math.min(maxPagesToOcr, fileItem.pageCount || 1) },
+              (_, i) => i + 1
+            );
 
-      const results = await runOcrOnDocument(
-        fileItem.file,
-        {
-          language,
-          pages: pageScope,
-        },
-        (progress) => {
-          setStatusText(progress.status);
-          setCurrentPage(progress.page);
-          setTotalPages(progress.totalPages);
-          setPagePercent(progress.percent);
-        },
-        (pageResult) => {
-          // Live streaming preview as each page completes!
-          setLivePages((prev) => [...prev, pageResult]);
-        }
-      );
+        const results = await runOcrOnDocument(
+          fileItem.file,
+          {
+            language,
+            pages: pageScope,
+          },
+          (progress) => {
+            setStatusText(progress.status);
+            setCurrentPage(progress.page);
+            setTotalPages(progress.totalPages);
+            setPagePercent(progress.percent);
+          },
+          (pageResult) => {
+            // Live streaming preview as each page completes!
+            setLivePages((prev) => [...prev, pageResult]);
+          }
+        );
 
-      setOcrResults(results);
+        setOcrResults(results);
 
-      // Save output to vault
-      const blob = new Blob([results.fullText], { type: 'text/plain;charset=utf-8' });
-      const baseName = fileItem.file.name.replace(/\.[^/.]+$/, '');
-      const outName = `${baseName}_OCR_${(language || 'ita').toUpperCase()}.txt`;
+        // Save output to vault
+        const blob = new Blob([results.fullText], { type: 'text/plain;charset=utf-8' });
+        const baseName = fileItem.file.name.replace(/\.[^/.]+$/, '');
+        const outName = `${baseName}_OCR_${(language || 'ita').toUpperCase()}.txt`;
 
-      await saveToVault({
-        toolId: 'ocr-pdf',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
-
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      setErrorMsg(
-        `Si è verificato un errore durante l'elaborazione OCR: ${
-          err.message || 'Errore worker WebAssembly'
-        }. Puoi provare con la lingua "Inglese (eng)" o utilizzare il modulo Python Desktop con Tesseract nativo.`
-      );
-    } finally {
-      setIsProcessing(false);
-      setStatusText('');
-    }
+        await persist({ name: outName, originalSize: fileItem.file.size, data: blob });
+        confetti({ particleCount: 50, spread: 55 });
+      } catch (err: any) {
+        setErrorMsg(
+          `Si è verificato un errore durante l'elaborazione OCR: ${
+            err.message || 'Errore worker WebAssembly'
+          }. Puoi provare con la lingua "Inglese (eng)" o utilizzare il modulo Python Desktop con Tesseract nativo.`
+        );
+      }
+    });
+    setStatusText('');
   };
 
   const currentResults = ocrResults || (livePages.length > 0 ? {
@@ -583,7 +570,10 @@ export const OcrTool: React.FC<OcrToolProps> = ({
               )}
 
               {/* Action Buttons: Dual mode (Neural OCR vs Fast Native Extraction) */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
+                <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   disabled={isProcessing}
@@ -617,6 +607,7 @@ export const OcrTool: React.FC<OcrToolProps> = ({
                     </>
                   )}
                 </button>
+                </div>
               </div>
             </div>
           )}

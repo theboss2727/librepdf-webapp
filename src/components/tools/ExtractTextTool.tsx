@@ -13,7 +13,8 @@ import {
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { extractTextFromPdf } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
 
 interface ExtractTextToolProps {
   onSuccess: () => void;
@@ -27,7 +28,6 @@ export const ExtractTextTool: React.FC<ExtractTextToolProps> = ({
   onSwitchToOcr,
 }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [isExtracting, setIsExtracting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [extractedData, setExtractedData] = useState<{
     fullText: string;
@@ -38,39 +38,34 @@ export const ExtractTextTool: React.FC<ExtractTextToolProps> = ({
   const [activeTab, setActiveTab] = useState<'all' | number>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const { run, persist, isProcessing: isExtracting, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'extract-text',
+    onSuccess,
+  });
+
   const fileItem = files[0];
 
   const handleExtract = async () => {
     if (!fileItem) return;
-    setIsExtracting(true);
     setProgress(5);
 
-    try {
-      const data = await extractTextFromPdf(fileItem.file, (pct) => {
-        setProgress(pct);
-      });
+    await run(
+      async () => {
+        const data = await extractTextFromPdf(fileItem.file, (pct) => {
+          setProgress(pct);
+        });
 
-      setExtractedData(data);
+        setExtractedData(data);
 
-      const blob = new Blob([data.fullText], { type: 'text/plain;charset=utf-8' });
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_testo.txt`;
+        const blob = new Blob([data.fullText], { type: 'text/plain;charset=utf-8' });
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const outName = `${baseName}_testo.txt`;
 
-      await saveToVault({
-        toolId: 'extract-text',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
-
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore estrazione testo: ${err.message}`);
-    } finally {
-      setIsExtracting(false);
-    }
+        await persist({ name: outName, originalSize: fileItem.file.size, data: blob });
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { errorPrefix: 'Errore estrazione testo' }
+    );
   };
 
   const handleCopy = async () => {
@@ -249,11 +244,14 @@ export const ExtractTextTool: React.FC<ExtractTextToolProps> = ({
 
           {fileItem && (
             <div className="space-y-3">
-              <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
-                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+              <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <span className="block text-xs text-zinc-600 dark:text-zinc-400">
                   Pronto per decodificare il testo da{' '}
                   <strong className="text-zinc-900 dark:text-zinc-100">{fileItem.file.name}</strong> ({fileItem.pageCount || '1+'} pagine).
                 </span>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
 
                 <button
                   disabled={isExtracting}
@@ -277,6 +275,7 @@ export const ExtractTextTool: React.FC<ExtractTextToolProps> = ({
                     </>
                   )}
                 </button>
+                </div>
               </div>
 
               {onSwitchToOcr && (

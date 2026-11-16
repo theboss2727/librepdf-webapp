@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Minimize2, Download, CheckCircle2, Loader2, ArrowDownRight } from 'lucide-react';
+import { Minimize2, Download, CheckCircle2, Loader2, Eye } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { compressPdf } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfViewerModal } from '../PdfViewerModal';
 
 interface CompressToolProps {
   onSuccess: () => void;
@@ -20,52 +22,49 @@ function formatBytes(bytes: number): string {
 export const CompressTool: React.FC<CompressToolProps> = ({ onSuccess }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [level, setLevel] = useState<'standard' | 'aggressive'>('aggressive');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [origSize, setOrigSize] = useState<number>(0);
   const [resultSize, setResultSize] = useState<number>(0);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'compress',
+    onSuccess,
+  });
   const fileItem = files[0];
 
   const handleCompress = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
     setOrigSize(fileItem.file.size);
 
-    try {
-      const bytes = await compressPdf(fileItem.file, level);
-      const blob = new Blob([bytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setResultSize(blob.size);
+    await run(
+      async () => {
+        const bytes = await compressPdf(fileItem.file, level);
+        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        setDownloadUrl(URL.createObjectURL(blob));
+        setResultBlob(blob);
+        setResultSize(blob.size);
 
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_ottimizzato.pdf`;
-
-      await saveToVault({
-        toolId: 'compress',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
-
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore compressione PDF: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        await persist({ name: `${baseName}_ottimizzato.pdf`, originalSize: fileItem.file.size, data: blob });
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Compressione completata', errorPrefix: 'Errore compressione PDF' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setFiles([]);
   };
 
   const savedPercentage = origSize > 0 ? Math.max(0, Math.round(((origSize - resultSize) / origSize) * 100)) : 0;
+  const outFileName = fileItem
+    ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_ottimizzato.pdf`
+    : 'documento_ottimizzato.pdf';
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -95,7 +94,7 @@ export const CompressTool: React.FC<CompressToolProps> = ({ onSuccess }) => {
               Compressione Completata
             </h3>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
-              Il documento ottimizzato è pronto per l'archiviazione o la trasmissione rapida.
+              Il documento ottimizzato è pronto per l'anteprima, l'archiviazione o il download.
             </p>
           </div>
 
@@ -115,18 +114,23 @@ export const CompressTool: React.FC<CompressToolProps> = ({ onSuccess }) => {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => setIsPreviewModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-300 font-bold text-xs shadow-xs transition hover:bg-emerald-50 dark:hover:bg-zinc-800 cursor-pointer"
+            >
+              <Eye className="w-4 h-4 text-emerald-500" />
+              <span>Anteprima PDF</span>
+            </button>
+
             <a
               href={downloadUrl}
-              download={
-                fileItem
-                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_ottimizzato.pdf`
-                  : 'documento_ottimizzato.pdf'
-              }
+              download={outFileName}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
             >
               <Download className="w-4 h-4 text-emerald-500" />
               <span>Scarica File Ottimizzato</span>
             </a>
+
             <button
               onClick={handleReset}
               className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition cursor-pointer"
@@ -188,11 +192,14 @@ export const CompressTool: React.FC<CompressToolProps> = ({ onSuccess }) => {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
+              {/* Preview Toggle & Processing Action */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleCompress}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
                 >
                   {isProcessing ? (
                     <>
@@ -211,6 +218,14 @@ export const CompressTool: React.FC<CompressToolProps> = ({ onSuccess }) => {
           )}
         </>
       )}
+
+      {/* PDF Viewer Modal */}
+      <PdfViewerModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        pdfBlob={resultBlob}
+        fileName={outFileName}
+      />
     </div>
   );
 };

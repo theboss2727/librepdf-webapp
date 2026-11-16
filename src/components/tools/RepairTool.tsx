@@ -3,7 +3,9 @@ import { Wrench, Download, CheckCircle2, Loader2, Code2, ArrowRight, ShieldCheck
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { repairPdf, inspectPdfDetails } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface RepairToolProps {
   onSuccess: () => void;
@@ -15,78 +17,82 @@ export const RepairTool: React.FC<RepairToolProps> = ({
   onOpenPythonStudio,
 }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
   const [inspectedInfo, setInspectedInfo] = useState<any | null>(null);
+
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'repair',
+    onSuccess,
+  });
 
   const fileItem = files[0];
 
   const handleRepair = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
 
-    try {
-      const bytes = await repairPdf(fileItem.file);
-      const blob = new Blob([bytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setResultBytes(blob.size);
+    await run(
+      async () => {
+        const bytes = await repairPdf(fileItem.file);
+        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        setDownloadUrl(URL.createObjectURL(blob));
+        setResultBlob(blob);
+        setResultBytes(blob.size);
 
-      // Also inspect repaired doc
-      try {
-        const info = await inspectPdfDetails(fileItem.file);
-        setInspectedInfo(info);
-      } catch {
-        // Ignored if corrupt
-      }
+        try {
+          const info = await inspectPdfDetails(fileItem.file);
+          setInspectedInfo(info);
+        } catch {
+          // Ignored if corrupt
+        }
 
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_riparato.pdf`;
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const outName = `${baseName}_riparato.pdf`;
 
-      await saveToVault({
-        toolId: 'repair',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
+        await persist({
+          name: outName,
+          originalSize: fileItem.file.size,
+          data: blob,
+        });
 
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore riparazione PDF: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Struttura PDF riparata con successo', errorPrefix: 'Errore riparazione PDF' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setResultBytes(null);
-    setInspectedInfo(null);
     setFiles([]);
+    setInspectedInfo(null);
   };
+
+  const outFileName = fileItem
+    ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_riparato.pdf`
+    : 'documento_riparato.pdf';
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       <div className="border-b border-zinc-200 dark:border-zinc-800 pb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-center font-bold">
-            <Wrench className="w-5 h-5 text-emerald-500" />
+            <Wrench className="w-5 h-5 text-amber-500" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                Riparazione Strutturale & XRef
+                Ripara & Ricostruisci PDF Corrotti
               </h2>
               <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
-                Cross-Reference Rebuild
+                XRef Table Sanitizer
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Ricostruisce la tabella degli indici interni del PDF, sanifica i nodi della gerarchia delle pagine e ricompila gli stream.
+              Corregge offset errati, trailer danneggiati ed errori di sintassi ripristinando l'indice interno del file.
             </p>
           </div>
         </div>
@@ -96,7 +102,7 @@ export const RepairTool: React.FC<RepairToolProps> = ({
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:border-zinc-400 transition cursor-pointer"
         >
           <Code2 className="w-3.5 h-3.5 text-amber-500" />
-          <span>Equivalente PyMuPDF garbage=4</span>
+          <span>Equivalente PyMuPDF doc.save(clean=True)</span>
         </button>
       </div>
 
@@ -107,16 +113,18 @@ export const RepairTool: React.FC<RepairToolProps> = ({
           </div>
           <div>
             <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-              Documento Riparato & Rigenerato
+              File Ricostruito con Successo
             </h3>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
-              La tabella degli indici è stata ricostruita e il file è stato salvato nel tuo archivio locale.
+              Tutti i descrittori di pagina e la tabella degli oggetti sono stati rigenerati conformemente alle specifiche PDF 1.7.
             </p>
           </div>
 
           {inspectedInfo && (
-            <div className="max-w-md mx-auto text-left p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs space-y-1 font-mono">
-              <div className="text-[10px] uppercase font-bold text-zinc-400 mb-1">Diagnostica Strutturale:</div>
+            <div className="max-w-md mx-auto p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-left font-mono text-xs space-y-1.5">
+              <div className="text-[10px] uppercase font-bold text-zinc-400 border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-2">
+                Dati Tecnici Ripristinati
+              </div>
               <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
                 <span>Pagine integre:</span>
                 <span className="font-bold text-zinc-900 dark:text-zinc-100">{inspectedInfo.pageCount}</span>
@@ -135,18 +143,17 @@ export const RepairTool: React.FC<RepairToolProps> = ({
           )}
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <PdfPreviewButton data={resultBlob} fileName={outFileName} />
+
             <a
               href={downloadUrl}
-              download={
-                fileItem
-                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_riparato.pdf`
-                  : 'documento_riparato.pdf'
-              }
+              download={outFileName}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
             >
               <Download className="w-4 h-4 text-emerald-500" />
               <span>Scarica PDF Riparato ({resultBytes ? (resultBytes / 1024 / 1024).toFixed(2) : 0} MB)</span>
             </a>
+
             <button
               onClick={handleReset}
               className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition cursor-pointer"
@@ -180,11 +187,13 @@ export const RepairTool: React.FC<RepairToolProps> = ({
                 </ul>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleRepair}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer ${
+                  className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer ${
                     !isProcessing
                       ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200'
                       : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'

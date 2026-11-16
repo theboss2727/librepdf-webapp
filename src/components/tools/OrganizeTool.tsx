@@ -14,9 +14,12 @@ import {
   MousePointerClick,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import toast from 'react-hot-toast';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { organizePdfPages, renderAllThumbnails, type PageConfig } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface OrganizeItem {
   id: string;
@@ -33,11 +36,16 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [pages, setPages] = useState<OrganizeItem[]>([]);
   const [loadingThumbnails, setLoadingThumbnails] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'organize',
+    onSuccess,
+  });
 
   const fileItem = files[0];
 
@@ -108,7 +116,7 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
 
   const handleDeletePage = (index: number) => {
     if (pages.length <= 1) {
-      alert('Il documento deve contenere almeno una pagina.');
+      toast.error('Il documento deve contenere almeno una pagina.');
       return;
     }
     setPages((prev) => prev.filter((_, i) => i !== index));
@@ -176,47 +184,47 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
 
   const handleSaveOrganized = async () => {
     if (!fileItem || pages.length === 0) return;
-    setIsProcessing(true);
 
-    try {
-      const pageConfigs: PageConfig[] = pages.map((p) => ({
-        originalIndex: p.originalIndex,
-        rotation: p.rotation,
-      }));
+    await run(
+      async () => {
+        const pageConfigs: PageConfig[] = pages.map((p) => ({
+          originalIndex: p.originalIndex,
+          rotation: p.rotation,
+        }));
 
-      const bytes = await organizePdfPages(fileItem.file, pageConfigs);
-      const blob = new Blob([bytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setResultBytes(blob.size);
+        const bytes = await organizePdfPages(fileItem.file, pageConfigs);
+        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        setDownloadUrl(URL.createObjectURL(blob));
+        setResultBlob(blob);
+        setResultBytes(blob.size);
 
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_riorganizzato.pdf`;
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const outName = `${baseName}_riorganizzato.pdf`;
 
-      await saveToVault({
-        toolId: 'organize',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
+        await persist({
+          name: outName,
+          originalSize: fileItem.file.size,
+          data: blob,
+        });
 
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore salvataggio pagine: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Sequenza salvata con successo', errorPrefix: 'Errore salvataggio pagine' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setResultBytes(null);
     setFiles([]);
     setPages([]);
   };
+
+  const outFileName = fileItem
+    ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_riorganizzato.pdf`
+    : 'documento_riorganizzato.pdf';
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -251,13 +259,11 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <PdfPreviewButton data={resultBlob} fileName={outFileName} />
+
             <a
               href={downloadUrl}
-              download={
-                fileItem
-                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_riorganizzato.pdf`
-                  : 'documento_riorganizzato.pdf'
-              }
+              download={outFileName}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
             >
               <Download className="w-4 h-4 text-blue-500" />
@@ -440,7 +446,9 @@ export const OrganizeTool: React.FC<OrganizeToolProps> = ({ onSuccess }) => {
                 })}
               </div>
 
-              <div className="flex justify-end pt-3 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleSaveOrganized}

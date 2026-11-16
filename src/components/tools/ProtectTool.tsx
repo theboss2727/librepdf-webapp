@@ -3,7 +3,10 @@ import { Lock, Download, CheckCircle2, Loader2, Eye, EyeOff, ShieldCheck, ArrowR
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { PDFDocument } from 'pdf-lib';
-import { saveToVault } from '../../services/storageVault';
+import toast from 'react-hot-toast';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface ProtectToolProps {
   onSuccess: () => void;
@@ -14,57 +17,53 @@ export const ProtectTool: React.FC<ProtectToolProps> = ({ onSuccess }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
+
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'protect',
+    onSuccess,
+  });
 
   const fileItem = files[0];
 
   const handleProtect = async () => {
     if (!fileItem) return;
     if (!password) {
-      alert('Inserisci una password di protezione.');
+      toast.error('Inserisci una password di protezione.');
       return;
     }
     if (password !== confirmPassword) {
-      alert('Le password inserite non coincidono.');
+      toast.error('Le password inserite non coincidono.');
       return;
     }
 
-    setIsProcessing(true);
+    await run(
+      async () => {
+        const buffer = await fileItem.file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
 
-    try {
-      const buffer = await fileItem.file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+        // Save with encrypted / protected stream
+        const bytes = await pdfDoc.save();
+        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setDownloadUrl(url);
+        setResultBlob(blob);
 
-      // Save with encrypted / protected stream
-      const bytes = await pdfDoc.save();
-      const blob = new Blob([bytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const outName = `${baseName}_protetto.pdf`;
 
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_protetto.pdf`;
-
-      await saveToVault({
-        toolId: 'protect',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
-
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore protezione PDF: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        await persist({ name: outName, originalSize: fileItem.file.size, data: blob });
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Documento protetto', errorPrefix: 'Errore protezione PDF' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setFiles([]);
     setPassword('');
     setConfirmPassword('');
@@ -108,6 +107,14 @@ export const ProtectTool: React.FC<ProtectToolProps> = ({ onSuccess }) => {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <PdfPreviewButton
+              data={resultBlob}
+              fileName={
+                fileItem
+                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_protetto.pdf`
+                  : 'documento_protetto.pdf'
+              }
+            />
             <a
               href={downloadUrl}
               download={
@@ -189,7 +196,9 @@ export const ProtectTool: React.FC<ProtectToolProps> = ({ onSuccess }) => {
                 </p>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing || !password}
                   onClick={handleProtect}

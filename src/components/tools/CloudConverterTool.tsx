@@ -27,7 +27,9 @@ import {
   convertFileWithFreeConvert,
   type FormatOption,
 } from '../../services/freeConvertApi';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface CloudConverterToolProps {
   onSuccess: () => void;
@@ -47,13 +49,18 @@ export const CloudConverterTool: React.FC<CloudConverterToolProps> = ({
   const [customFormat, setCustomFormat] = useState<string>('');
   const [isCustomMode, setIsCustomMode] = useState(false);
 
-  const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('');
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
   const [outputName, setOutputName] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'cloud-converter',
+    onSuccess,
+  });
 
   const fileItem = files[0];
 
@@ -106,46 +113,44 @@ export const CloudConverterTool: React.FC<CloudConverterToolProps> = ({
       return;
     }
 
-    setIsProcessing(true);
     setErrorMsg(null);
     setProgress(5);
     setStatusMsg('Avvio procedura di conversione cloud...');
 
-    try {
-      const result = await convertFileWithFreeConvert(
-        fileItem.file,
-        finalFormat,
-        apiKey,
-        (pct, msg) => {
-          setProgress(pct);
-          setStatusMsg(msg);
-        }
-      );
+    await run(
+      async () => {
+        const result = await convertFileWithFreeConvert(
+          fileItem.file,
+          finalFormat,
+          apiKey,
+          (pct, msg) => {
+            setProgress(pct);
+            setStatusMsg(msg);
+          }
+        );
 
-      setDownloadUrl(result.downloadUrl);
-      setResultBytes(result.resultBlob.size);
-      setOutputName(result.outputFilename);
+        setDownloadUrl(result.downloadUrl);
+        setResultBlob(result.resultBlob);
+        setResultBytes(result.resultBlob.size);
+        setOutputName(result.outputFilename);
 
-      await saveToVault({
-        toolId: 'cloud-converter',
-        name: result.outputFilename,
-        originalSize: fileItem.file.size,
-        resultSize: result.resultBlob.size,
-        data: result.resultBlob,
-      });
+        await persist({
+          name: result.outputFilename,
+          originalSize: fileItem.file.size,
+          resultSize: result.resultBlob.size,
+          data: result.resultBlob,
+        });
 
-      onSuccess();
-      confetti({ particleCount: 50, spread: 60 });
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Errore durante la conversione cloud.');
-    } finally {
-      setIsProcessing(false);
-    }
+        confetti({ particleCount: 50, spread: 60 });
+      },
+      { successMessage: 'Conversione cloud completata con successo', errorPrefix: 'Errore conversione cloud' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setResultBytes(null);
     setFiles([]);
     setProgress(0);
@@ -273,6 +278,10 @@ export const CloudConverterTool: React.FC<CloudConverterToolProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {outputName.toLowerCase().endsWith('.pdf') && (
+              <PdfPreviewButton data={resultBlob} fileName={outputName} />
+            )}
+
             <a
               href={downloadUrl}
               download={outputName}
@@ -414,11 +423,8 @@ export const CloudConverterTool: React.FC<CloudConverterToolProps> = ({
               )}
 
               {/* Action Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>Elaborazione cloud protetta con FreeConvert API</span>
-                </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
 
                 <button
                   disabled={isProcessing}

@@ -20,6 +20,8 @@ import { saveToVault } from '../../services/storageVault';
 
 interface XlsxToPdfToolProps {
   onSuccess: () => void;
+  onOpenPythonStudio?: () => void;
+  onSwitchToCloudConverter?: () => void;
 }
 
 export const XlsxToPdfTool: React.FC<XlsxToPdfToolProps> = ({ onSuccess }) => {

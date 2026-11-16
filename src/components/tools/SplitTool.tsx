@@ -4,7 +4,9 @@ import JSZip from 'jszip';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { splitPdf } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface SplitToolProps {
   onSuccess: () => void;
@@ -15,19 +17,21 @@ export const SplitTool: React.FC<SplitToolProps> = ({ onSuccess }) => {
   const [splitMode, setSplitMode] = useState<'ranges' | 'all-pages' | 'fixed-chunks'>('ranges');
   const [rangeString, setRangeString] = useState('1-3');
   const [chunkSize, setChunkSize] = useState(2);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<{ name: string; blob: Blob; url: string }[]>([]);
   const [zipUrl, setZipUrl] = useState<string | null>(null);
 
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'split',
+    onSuccess,
+  });
   const fileItem = files[0];
 
   const handleSplit = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
     setProgress(15);
 
-    try {
+    await run(async () => {
       const splitOutputs = await splitPdf(
         fileItem.file,
         splitMode,
@@ -58,22 +62,15 @@ export const SplitTool: React.FC<SplitToolProps> = ({ onSuccess }) => {
       }
 
       if (items.length > 0) {
-        await saveToVault({
-          toolId: 'split',
+        await persist({
           name: items[0].name,
           originalSize: fileItem.file.size,
-          resultSize: items[0].blob.size,
           data: items[0].blob,
         });
       }
 
-      onSuccess();
       confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore divisione PDF: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+    }, { successMessage: 'Segmentazione completata', errorPrefix: 'Errore divisione PDF' });
   };
 
   const handleReset = () => {
@@ -146,14 +143,22 @@ export const SplitTool: React.FC<SplitToolProps> = ({ onSuccess }) => {
                   className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
                 >
                   <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate pr-2 font-mono">{res.name}</span>
-                  <a
-                    href={res.url}
-                    download={res.name}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold hover:border-zinc-400 transition shrink-0"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Scarica</span>
-                  </a>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <PdfPreviewButton
+                      data={res.blob}
+                      fileName={res.name}
+                      label="Anteprima"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold hover:border-zinc-400 transition shrink-0 cursor-pointer"
+                    />
+                    <a
+                      href={res.url}
+                      download={res.name}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold hover:border-zinc-400 transition shrink-0"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Scarica</span>
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
@@ -276,11 +281,13 @@ export const SplitTool: React.FC<SplitToolProps> = ({ onSuccess }) => {
                 </div>
               )}
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleSplit}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
                 >
                   {isProcessing ? (
                     <>

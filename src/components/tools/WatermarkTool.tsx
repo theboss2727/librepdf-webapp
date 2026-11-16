@@ -3,7 +3,9 @@ import { Stamp, Download, CheckCircle2, Loader2, Code2, Eye, AlertCircle } from 
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { addWatermark, renderPageToImage } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 import type { WatermarkOptions } from '../../types/pdf';
 
 interface WatermarkToolProps {
@@ -22,12 +24,17 @@ export const WatermarkTool: React.FC<WatermarkToolProps> = ({
   const [rotation, setRotation] = useState(45); // PyMuPDF default
   const [opacity, setOpacity] = useState(0.3); // PyMuPDF default
   const [pageTarget, setPageTarget] = useState<'all' | 'odd' | 'even'>('all');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'watermark',
+    onSuccess,
+  });
 
   const fileItem = files[0];
 
@@ -57,53 +64,53 @@ export const WatermarkTool: React.FC<WatermarkToolProps> = ({
 
   const handleApplyWatermark = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
     setErrorMsg(null);
 
-    try {
-      const options: WatermarkOptions = {
-        text,
-        color,
-        fontSize,
-        rotation,
-        opacity,
-        pages: pageTarget,
-      };
+    await run(
+      async () => {
+        const options: WatermarkOptions = {
+          text,
+          color,
+          fontSize,
+          rotation,
+          opacity,
+          pages: pageTarget,
+        };
 
-      const resultBytes = await addWatermark(fileItem.file, options);
-      const blob = new Blob([resultBytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setResultBytes(blob.size);
+        const bytes = await addWatermark(fileItem.file, options);
+        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        setDownloadUrl(URL.createObjectURL(blob));
+        setResultBlob(blob);
+        setResultBytes(blob.size);
 
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_filigrana.pdf`;
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const outName = `${baseName}_filigrana.pdf`;
 
-      await saveToVault({
-        toolId: 'watermark',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
+        await persist({
+          name: outName,
+          originalSize: fileItem.file.size,
+          data: blob,
+        });
 
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      setErrorMsg(`Errore applicazione filigrana: ${err.message || err}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Filigrana incisa con successo', errorPrefix: 'Errore applicazione filigrana' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setResultBytes(null);
     setPreviewImageUrl(null);
     setFiles([]);
     setErrorMsg(null);
   };
+
+  const outFileName = fileItem
+    ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_filigrana.pdf`
+    : 'documento_filigrana.pdf';
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -151,13 +158,11 @@ export const WatermarkTool: React.FC<WatermarkToolProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <PdfPreviewButton data={resultBlob} fileName={outFileName} />
+
             <a
               href={downloadUrl}
-              download={
-                fileItem
-                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_filigrana.pdf`
-                  : 'documento_filigrana.pdf'
-              }
+              download={outFileName}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
             >
               <Download className="w-4 h-4 text-rose-500" />
@@ -383,24 +388,27 @@ export const WatermarkTool: React.FC<WatermarkToolProps> = ({
 
               {/* Action Buttons */}
               <div className="lg:col-span-12 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                <button
-                  type="button"
-                  disabled={isPreviewing}
-                  onClick={handlePreviewWatermark}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold text-xs transition cursor-pointer disabled:opacity-50"
-                >
-                  {isPreviewing ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
-                      <span>Elaborazione Anteprima...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="w-3.5 h-3.5 text-rose-500" />
-                      <span>Verifica Anteprima su Documento</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+                  <button
+                    type="button"
+                    disabled={isPreviewing}
+                    onClick={handlePreviewWatermark}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isPreviewing ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                        <span>Elaborazione Anteprima...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Verifica Anteprima su Documento</span>
+                      </>
+                    )}
+                  </button>
+                </div>
 
                 <button
                   disabled={isProcessing}

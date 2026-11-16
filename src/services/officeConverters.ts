@@ -1,4 +1,4 @@
-import * as pdfjsLib from 'pdfjs-dist';
+﻿import { pdfjsLib } from './pdfjsSetup';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 import * as XLSX from 'xlsx';
@@ -65,7 +65,7 @@ export async function convertPdfToDocx(
       new Paragraph({
         children: [
           new TextRun({
-            text: `Documento PDF — Pagina ${pageNum}`,
+            text: `Documento PDF â€” Pagina ${pageNum}`,
             size: 18,
             color: '64748B',
             italics: true,
@@ -292,7 +292,7 @@ function sanitizeForStandardFont(text: string, font: any): string {
     .replace(/[\u2194\u21D4]/g, '<->')
     .replace(/[\u2713\u2714]/g, '[x]')
     .replace(/[\u2717\u2718]/g, '[ ]')
-    .replace(/[\u25CF\u25E6\u25AA\u25AB\u2023]/g, '•')
+    .replace(/[\u25CF\u25E6\u25AA\u25AB\u2023]/g, 'â€¢')
     .replace(/\t/g, '    ')
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''); // Emojis / surrogate pairs
 
@@ -302,7 +302,7 @@ function sanitizeForStandardFont(text: string, font: any): string {
       font.widthOfTextAtSize(char, 11);
       result += char;
     } catch {
-      // Try decomposing diacritics (e.g. ą -> a, ś -> s)
+      // Try decomposing diacritics (e.g. Ä… -> a, Å› -> s)
       const decomposed = char.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       try {
         font.widthOfTextAtSize(decomposed, 11);
@@ -573,7 +573,7 @@ export async function convertDocxToPdf(
       for (let i = 0; i < items.length; i++) {
         const itemText = (items[i].textContent || '').trim();
         if (!itemText) continue;
-        const prefix = tagName === 'ol' ? `${i + 1}. ` : '• ';
+        const prefix = tagName === 'ol' ? `${i + 1}. ` : 'â€¢ ';
         const fullText = prefix + itemText;
         const lines = wrapText(fullText, fontRegular, 10.5, availableWidth - 15);
         for (const line of lines) {
@@ -823,7 +823,7 @@ function extractPrintableTextFromIwa(buf: Uint8Array): string[] {
   const rawText = decoder.decode(buf);
   const lines: string[] = [];
   // Scan for sequences of 4+ readable characters (Latin, accented letters, punctuation)
-  const regex = /[\w\s.,;:!?'"()/\-–—€$@%&*+=#\u00C0-\u017F]{4,}/g;
+  const regex = /[\w\s.,;:!?'"()/\-â€“â€”â‚¬$@%&*+=#\u00C0-\u017F]{4,}/g;
   let match;
   while ((match = regex.exec(rawText)) !== null) {
     const s = match[0].trim();
@@ -1263,7 +1263,7 @@ export async function convertXlsxToPdf(
     const ensureSpace = (needed: number) => {
       if (currentY - needed < bottomMargin) {
         // Footer
-        currentPage.drawText(`${sheetName} — Pagina ${pageNum}`, {
+        currentPage.drawText(`${sheetName} â€” Pagina ${pageNum}`, {
           x: pageWidth - margin - 120,
           y: 20,
           size: 8.5,
@@ -1363,7 +1363,7 @@ export async function convertXlsxToPdf(
     }
 
     // Final page footer
-    currentPage.drawText(`${sheetName} — Pagina ${pageNum}`, {
+    currentPage.drawText(`${sheetName} â€” Pagina ${pageNum}`, {
       x: pageWidth - margin - 120,
       y: 20,
       size: 8.5,

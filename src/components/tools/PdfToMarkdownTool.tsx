@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { FileCode2, Copy, Check, Download, Loader2, ArrowRight } from 'lucide-react';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { extractTextFromPdf } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
 
 interface PdfToMarkdownToolProps {
   onSuccess: () => void;
@@ -10,53 +11,57 @@ interface PdfToMarkdownToolProps {
 
 export const PdfToMarkdownTool: React.FC<PdfToMarkdownToolProps> = ({ onSuccess }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [markdownContent, setMarkdownContent] = useState<string | null>(null);
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [activeFormat, setActiveFormat] = useState<'markdown' | 'html'>('markdown');
   const [copied, setCopied] = useState(false);
 
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'pdf-to-markdown',
+    onSuccess,
+  });
+
   const fileItem = files[0];
 
   const handleConvert = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
 
-    try {
-      const data = await extractTextFromPdf(fileItem.file);
-      const title = fileItem.file.name.replace(/\.[^/.]+$/, '');
+    await run(
+      async () => {
+        const data = await extractTextFromPdf(fileItem.file);
+        const title = fileItem.file.name.replace(/\.[^/.]+$/, '');
 
-      // Generate clean Markdown representation
-      let mdString = `# ${title}\n\n`;
-      data.pages.forEach((p) => {
-        mdString += `## Pagina ${p.pageNumber}\n\n`;
-        const lines = p.text
-          .split('\n')
-          .map((l) => l.trim())
-          .filter(Boolean);
+        // Generate clean Markdown representation
+        let mdString = `# ${title}\n\n`;
+        data.pages.forEach((p) => {
+          mdString += `## Pagina ${p.pageNumber}\n\n`;
+          const lines = p.text
+            .split('\n')
+            .map((l) => l.trim())
+            .filter(Boolean);
 
-        lines.forEach((l) => {
-          if (l.length < 50 && (l.endsWith(':') || /^[A-Z0-9\s]{4,}$/.test(l))) {
-            mdString += `### ${l}\n\n`;
-          } else {
-            mdString += `${l}\n\n`;
-          }
+          lines.forEach((l) => {
+            if (l.length < 50 && (l.endsWith(':') || /^[A-Z0-9\s]{4,}$/.test(l))) {
+              mdString += `### ${l}\n\n`;
+            } else {
+              mdString += `${l}\n\n`;
+            }
+          });
         });
-      });
 
-      setMarkdownContent(mdString);
+        setMarkdownContent(mdString);
 
-      // Generate HTML format
-      const htmlBody = data.pages
-        .map(
-          (p) => `  <section class="pdf-page" data-page="${p.pageNumber}">
+        // Generate HTML format
+        const htmlBody = data.pages
+          .map(
+            (p) => `  <section class="pdf-page" data-page="${p.pageNumber}">
     <h2>Pagina ${p.pageNumber}</h2>
     <p>${p.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
   </section>`
-        )
-        .join('\n\n');
+          )
+          .join('\n\n');
 
-      const fullHtml = `<!DOCTYPE html>
+        const fullHtml = `<!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8">
@@ -74,24 +79,18 @@ ${htmlBody}
 </body>
 </html>`;
 
-      setHtmlContent(fullHtml);
+        setHtmlContent(fullHtml);
 
-      // Auto save to local vault
-      const blob = new Blob([mdString], { type: 'text/markdown;charset=utf-8' });
-      await saveToVault({
-        toolId: 'pdf-to-markdown',
-        name: `${title}.md`,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
-
-      onSuccess();
-    } catch (err: any) {
-      alert(`Errore conversione in Markdown: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        // Auto save to local vault
+        const blob = new Blob([mdString], { type: 'text/markdown;charset=utf-8' });
+        await persist({
+          name: `${title}.md`,
+          originalSize: fileItem.file.size,
+          data: blob,
+        });
+      },
+      { successMessage: 'Conversione in Markdown completata', errorPrefix: 'Errore conversione in Markdown' }
+    );
   };
 
   const handleCopy = async () => {
@@ -225,11 +224,8 @@ ${htmlBody}
           />
 
           {fileItem && (
-            <div className="p-4 sm:p-5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                Pronto per transcodificare{' '}
-                <strong className="text-zinc-900 dark:text-zinc-100">{fileItem.file.name}</strong> ({fileItem.pageCount || '1+'} pagine).
-              </span>
+            <div className="p-4 sm:p-5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
 
               <button
                 disabled={isProcessing}

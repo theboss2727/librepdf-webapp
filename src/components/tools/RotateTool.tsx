@@ -3,7 +3,9 @@ import { RotateCw, RotateCcw, Download, CheckCircle2, Loader2 } from 'lucide-rea
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { rotatePdf } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface RotateToolProps {
   onSuccess: () => void;
@@ -13,49 +15,51 @@ export const RotateTool: React.FC<RotateToolProps> = ({ onSuccess }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [angle, setAngle] = useState(90);
   const [target, setTarget] = useState<'all' | 'odd' | 'even'>('all');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
 
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'rotate',
+    onSuccess,
+  });
   const fileItem = files[0];
 
   const handleRotate = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
 
-    try {
+    await run(async () => {
       const result = await rotatePdf(fileItem.file, angle, target);
       const blob = new Blob([result as any], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
+      setResultBlob(blob);
       setResultBytes(blob.size);
 
       const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
       const outName = `${baseName}_ruotato_${angle}deg.pdf`;
 
-      await saveToVault({
-        toolId: 'rotate',
+      await persist({
         name: outName,
         originalSize: fileItem.file.size,
-        resultSize: blob.size,
         data: blob,
       });
 
-      onSuccess();
       confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore rotazione PDF: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+    }, { successMessage: 'Rotazione completata', errorPrefix: 'Errore rotazione PDF' });
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setResultBytes(null);
     setFiles([]);
   };
+
+  const outFileName = fileItem
+    ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_ruotato.pdf`
+    : 'documento_ruotato.pdf';
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -90,13 +94,10 @@ export const RotateTool: React.FC<RotateToolProps> = ({ onSuccess }) => {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <PdfPreviewButton data={resultBlob} fileName={outFileName} />
             <a
               href={downloadUrl}
-              download={
-                fileItem
-                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_ruotato.pdf`
-                  : 'documento_ruotato.pdf'
-              }
+              download={outFileName}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
             >
               <Download className="w-4 h-4 text-violet-500" />
@@ -213,11 +214,13 @@ export const RotateTool: React.FC<RotateToolProps> = ({ onSuccess }) => {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleRotate}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
                 >
                   {isProcessing ? (
                     <>

@@ -3,7 +3,9 @@ import { Layers, Download, CheckCircle2, Loader2, Code2, ArrowRight, ShieldAlert
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { flattenPdf } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface FlattenToolProps {
   onSuccess: () => void;
@@ -15,49 +17,54 @@ export const FlattenTool: React.FC<FlattenToolProps> = ({
   onOpenPythonStudio,
 }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
+
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'flatten',
+    onSuccess,
+  });
 
   const fileItem = files[0];
 
   const handleFlatten = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
 
-    try {
-      const bytes = await flattenPdf(fileItem.file);
-      const blob = new Blob([bytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setResultBytes(blob.size);
+    await run(
+      async () => {
+        const bytes = await flattenPdf(fileItem.file);
+        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        setDownloadUrl(URL.createObjectURL(blob));
+        setResultBlob(blob);
+        setResultBytes(blob.size);
 
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_appiattito.pdf`;
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const outName = `${baseName}_appiattito.pdf`;
 
-      await saveToVault({
-        toolId: 'flatten',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
+        await persist({
+          name: outName,
+          originalSize: fileItem.file.size,
+          data: blob,
+        });
 
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore appiattimento PDF: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Moduli e annotazioni fissati con successo', errorPrefix: 'Errore appiattimento PDF' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
+    setResultBlob(null);
     setResultBytes(null);
     setFiles([]);
   };
+
+  const outFileName = fileItem
+    ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_appiattito.pdf`
+    : 'documento_appiattito.pdf';
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -105,18 +112,17 @@ export const FlattenTool: React.FC<FlattenToolProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <PdfPreviewButton data={resultBlob} fileName={outFileName} />
+
             <a
               href={downloadUrl}
-              download={
-                fileItem
-                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_appiattito.pdf`
-                  : 'documento_appiattito.pdf'
-              }
+              download={outFileName}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs shadow-xs transition hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
             >
               <Download className="w-4 h-4 text-emerald-500" />
               <span>Scarica PDF Appiattito ({resultBytes ? (resultBytes / 1024 / 1024).toFixed(2) : 0} MB)</span>
             </a>
+
             <button
               onClick={handleReset}
               className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition cursor-pointer"
@@ -149,11 +155,13 @@ export const FlattenTool: React.FC<FlattenToolProps> = ({
                 </p>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleFlatten}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer ${
+                  className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer ${
                     !isProcessing
                       ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200'
                       : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'

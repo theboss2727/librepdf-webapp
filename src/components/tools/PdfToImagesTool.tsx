@@ -4,7 +4,8 @@ import JSZip from 'jszip';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { renderPageToImage } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
 
 interface PdfToImagesToolProps {
   onSuccess: () => void;
@@ -15,64 +16,64 @@ export const PdfToImagesTool: React.FC<PdfToImagesToolProps> = ({ onSuccess }) =
   const [format, setFormat] = useState<'jpeg' | 'png'>('jpeg');
   const [scale, setScale] = useState(2.0); // HD 144 DPI default
   const [quality, setQuality] = useState(0.92); // 92% quality for JPEG
-  const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [renderedPages, setRenderedPages] = useState<
     { pageNumber: number; dataUrl: string; blob: Blob }[]
   >([]);
   const [zipUrl, setZipUrl] = useState<string | null>(null);
 
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'pdf-to-images',
+    onSuccess,
+  });
+
   const fileItem = files[0];
 
   const handleConvert = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
     setProgress(5);
 
-    try {
-      const buffer = await fileItem.file.arrayBuffer();
-      const pageCount = fileItem.pageCount || 1;
-      const pagesOut: { pageNumber: number; dataUrl: string; blob: Blob }[] = [];
+    await run(
+      async () => {
+        const buffer = await fileItem.file.arrayBuffer();
+        const pageCount = fileItem.pageCount || 1;
+        const pagesOut: { pageNumber: number; dataUrl: string; blob: Blob }[] = [];
 
-      for (let i = 1; i <= pageCount; i++) {
-        const rendered = await renderPageToImage(buffer, i, scale, format, quality);
-        pagesOut.push({
-          pageNumber: i,
-          dataUrl: rendered.dataUrl,
-          blob: rendered.blob,
+        for (let i = 1; i <= pageCount; i++) {
+          const rendered = await renderPageToImage(buffer, i, scale, format, quality);
+          pagesOut.push({
+            pageNumber: i,
+            dataUrl: rendered.dataUrl,
+            blob: rendered.blob,
+          });
+          setProgress(Math.round((i / pageCount) * 100));
+        }
+
+        setRenderedPages(pagesOut);
+
+        // Create ZIP bundle
+        const zip = new JSZip();
+        const ext = format === 'jpeg' ? 'jpg' : 'png';
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        pagesOut.forEach((p) => {
+          zip.file(`${baseName}_pagina_${p.pageNumber}.${ext}`, p.blob);
         });
-        setProgress(Math.round((i / pageCount) * 100));
-      }
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zUrl = URL.createObjectURL(zipBlob);
+        setZipUrl(zUrl);
 
-      setRenderedPages(pagesOut);
+        // Save ZIP to vault
+        await persist({
+          name: `${baseName}_immagini_${ext}.zip`,
+          originalSize: fileItem.file.size,
+          resultSize: zipBlob.size,
+          data: zipBlob,
+        });
 
-      // Create ZIP bundle
-      const zip = new JSZip();
-      const ext = format === 'jpeg' ? 'jpg' : 'png';
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      pagesOut.forEach((p) => {
-        zip.file(`${baseName}_pagina_${p.pageNumber}.${ext}`, p.blob);
-      });
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const zUrl = URL.createObjectURL(zipBlob);
-      setZipUrl(zUrl);
-
-      // Save ZIP to vault
-      await saveToVault({
-        toolId: 'pdf-to-images',
-        name: `${baseName}_immagini_${ext}.zip`,
-        originalSize: fileItem.file.size,
-        resultSize: zipBlob.size,
-        data: zipBlob,
-      });
-
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore conversione in immagini: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Pagine esportate in immagini con successo', errorPrefix: 'Errore conversione in immagini' }
+    );
   };
 
   const handleReset = () => {
@@ -296,7 +297,9 @@ export const PdfToImagesTool: React.FC<PdfToImagesToolProps> = ({ onSuccess }) =
                 </div>
               )}
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleConvert}

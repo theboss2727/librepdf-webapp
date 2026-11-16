@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -17,6 +18,7 @@ interface LocalCapabilities {
   pdfToXlsx: boolean;
   officeToPdf: boolean;
   libreOfficeCmd: string | null;
+  pythonCmd: string | null;
 }
 
 let cachedCapabilities: LocalCapabilities | null = null;
@@ -24,10 +26,22 @@ let cachedCapabilities: LocalCapabilities | null = null;
 async function detectLocalCapabilities(): Promise<LocalCapabilities> {
   if (cachedCapabilities) return cachedCapabilities;
 
+  const isWin = process.platform === 'win32';
+  const checkCmd = isWin ? 'where.exe' : 'which';
+
   let libreOfficeCmd: string | null = null;
-  for (const cmd of ['soffice', 'libreoffice']) {
+  const officeCandidates = isWin
+    ? ['soffice', 'libreoffice', 'C:\\Program Files\\LibreOffice\\program\\soffice.exe']
+    : ['soffice', 'libreoffice'];
+
+  for (const cmd of officeCandidates) {
     try {
-      await execFileAsync('which', [cmd]);
+      if (cmd.includes('\\') || cmd.includes('/')) {
+        await fs.access(cmd);
+        libreOfficeCmd = cmd;
+        break;
+      }
+      await execFileAsync(checkCmd, [cmd]);
       libreOfficeCmd = cmd;
       break;
     } catch {
@@ -35,20 +49,35 @@ async function detectLocalCapabilities(): Promise<LocalCapabilities> {
     }
   }
 
+  let pythonCmd: string | null = null;
+  for (const py of ['python3', 'python', 'py']) {
+    try {
+      await execFileAsync(py, ['--version']);
+      pythonCmd = py;
+      break;
+    } catch {
+      // not found
+    }
+  }
+
   let hasPdf2Docx = false;
-  try {
-    await execFileAsync('python3', ['-c', 'import pdf2docx']);
-    hasPdf2Docx = true;
-  } catch {
-    hasPdf2Docx = false;
+  if (pythonCmd) {
+    try {
+      await execFileAsync(pythonCmd, ['-c', 'import pdf2docx']);
+      hasPdf2Docx = true;
+    } catch {
+      hasPdf2Docx = false;
+    }
   }
 
   let hasPdfPlumber = false;
-  try {
-    await execFileAsync('python3', ['-c', 'import pdfplumber, openpyxl']);
-    hasPdfPlumber = true;
-  } catch {
-    hasPdfPlumber = false;
+  if (pythonCmd) {
+    try {
+      await execFileAsync(pythonCmd, ['-c', 'import pdfplumber, openpyxl']);
+      hasPdfPlumber = true;
+    } catch {
+      hasPdfPlumber = false;
+    }
   }
 
   cachedCapabilities = {
@@ -56,6 +85,7 @@ async function detectLocalCapabilities(): Promise<LocalCapabilities> {
     pdfToXlsx: hasPdfPlumber,
     officeToPdf: Boolean(libreOfficeCmd),
     libreOfficeCmd,
+    pythonCmd,
   };
 
   return cachedCapabilities;
@@ -63,6 +93,7 @@ async function detectLocalCapabilities(): Promise<LocalCapabilities> {
 
 async function startServer() {
   const app = express();
+  const httpServer = http.createServer(app);
   const caps = await detectLocalCapabilities();
 
   // 1. Silent Local Engine Capability Check (under the hood)
@@ -108,7 +139,7 @@ async function startServer() {
             'cv.close()',
           ].join('\n');
 
-          await execFileAsync('python3', ['-c', pyCode, inputPath, outputPath], {
+          await execFileAsync(caps.pythonCmd || 'python3', ['-c', pyCode, inputPath, outputPath], {
             timeout: 120000,
           });
 
@@ -140,7 +171,7 @@ async function startServer() {
             'wb.save(sys.argv[2])',
           ].join('\n');
 
-          await execFileAsync('python3', ['-c', pyCode, inputPath, outputPath], {
+          await execFileAsync(caps.pythonCmd || 'python3', ['-c', pyCode, inputPath, outputPath], {
             timeout: 120000,
           });
 
@@ -213,7 +244,10 @@ async function startServer() {
   // 4. Vite Dev Middleware vs Production Static Assets
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server: httpServer },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -225,9 +259,23 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`LibrePDF Studio server listening on http://0.0.0.0:${PORT}`);
-  });
+  function listenOnPort(port: number, maxRetries = 10) {
+    httpServer.listen(port, '0.0.0.0', () => {
+      console.log(`\n🚀 LibrePDF Studio listening on http://localhost:${port} (and http://0.0.0.0:${port})\n`);
+    });
+
+    httpServer.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE' && maxRetries > 0) {
+        console.warn(`⚠️ Porta ${port} già occupata. Tentativo automatico su porta ${port + 1}...`);
+        httpServer.removeAllListeners('error');
+        listenOnPort(port + 1, maxRetries - 1);
+      } else {
+        console.error('Errore listener server:', err);
+      }
+    });
+  }
+
+  listenOnPort(PORT);
 }
 
 startServer();

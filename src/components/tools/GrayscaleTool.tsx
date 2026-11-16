@@ -3,7 +3,9 @@ import { SunMedium, Download, CheckCircle2, Loader2, Code2, ArrowRight } from 'l
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { convertPdfToGrayscale } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
+import { PdfPreviewButton } from '../PdfPreviewButton';
 
 interface GrayscaleToolProps {
   onSuccess: () => void;
@@ -16,60 +18,57 @@ export const GrayscaleTool: React.FC<GrayscaleToolProps> = ({
 }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [scale, setScale] = useState<number>(2.0); // 144 DPI
-  const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
+
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'grayscale',
+    onSuccess,
+  });
 
   const fileItem = files[0];
 
   const handleConvert = async () => {
     if (!fileItem) return;
-    setIsProcessing(true);
     setProgress(5);
 
-    try {
-      const bytes = await convertPdfToGrayscale(
-        fileItem.file,
-        scale,
-        (pct, cur, tot) => {
-          setProgress(pct);
-          setCurrentPage(cur);
-          setTotalPages(tot);
-        }
-      );
+    await run(
+      async () => {
+        const bytes = await convertPdfToGrayscale(
+          fileItem.file,
+          scale,
+          (pct, cur, tot) => {
+            setProgress(pct);
+            setCurrentPage(cur);
+            setTotalPages(tot);
+          }
+        );
 
-      const blob = new Blob([bytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setResultBytes(blob.size);
+        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setDownloadUrl(url);
+        setResultBytes(blob.size);
+        setResultBlob(blob);
 
-      const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
-      const outName = `${baseName}_monocromatico.pdf`;
+        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const outName = `${baseName}_monocromatico.pdf`;
 
-      await saveToVault({
-        toolId: 'grayscale',
-        name: outName,
-        originalSize: fileItem.file.size,
-        resultSize: blob.size,
-        data: blob,
-      });
-
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      alert(`Errore conversione in scala di grigi: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+        await persist({ name: outName, originalSize: fileItem.file.size, data: blob });
+        confetti({ particleCount: 50, spread: 55 });
+      },
+      { successMessage: 'Conversione in scala di grigi completata', errorPrefix: 'Errore conversione in scala di grigi' }
+    );
   };
 
   const handleReset = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl(null);
     setResultBytes(null);
+    setResultBlob(null);
     setFiles([]);
     setProgress(0);
   };
@@ -120,6 +119,14 @@ export const GrayscaleTool: React.FC<GrayscaleToolProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <PdfPreviewButton
+              data={resultBlob}
+              fileName={
+                fileItem
+                  ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_monocromatico.pdf`
+                  : 'documento_monocromatico.pdf'
+              }
+            />
             <a
               href={downloadUrl}
               download={
@@ -197,7 +204,9 @@ export const GrayscaleTool: React.FC<GrayscaleToolProps> = ({
                 </div>
               )}
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleConvert}

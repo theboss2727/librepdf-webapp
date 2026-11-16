@@ -30,8 +30,12 @@ import {
   SunMedium,
   FileCode2,
   Sparkles,
+  Palette,
+  Eraser,
+  ShieldCheck,
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
+import { useThemePreset } from '../context/ThemePresetProvider';
 import type { ToolId } from '../types/pdf';
 
 interface HeaderProps {
@@ -59,6 +63,8 @@ export const Header: React.FC<HeaderProps> = ({
   onQuickSearchClick,
 }) => {
   const [openMenu, setOpenMenu] = useState<'pdf' | 'convert' | null>(null);
+  const [isPresetOpen, setIsPresetOpen] = useState(false);
+  const { preset, setPreset, availablePresets } = useThemePreset();
   const navRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -163,6 +169,9 @@ export const Header: React.FC<HeaderProps> = ({
                     Sicurezza, OCR & Immagini
                   </div>
                   {[
+                    { id: 'verify-signature' as ToolId, label: 'Verifica Firme & Integrità', icon: ShieldCheck, color: 'text-blue-500' },
+                    { id: 'sign-pdf' as ToolId, label: 'Firma & Timbro Certificato', icon: PenTool, color: 'text-emerald-500' },
+                    { id: 'redact-pdf' as ToolId, label: 'Oscuramento Permanente', icon: Eraser, color: 'text-rose-500' },
                     { id: 'compress' as ToolId, label: 'Comprimi PDF', icon: Minimize2, color: 'text-cyan-500' },
                     { id: 'protect' as ToolId, label: 'Proteggi con Password', icon: Lock, color: 'text-red-500' },
                     { id: 'ocr-pdf' as ToolId, label: 'OCR Tesseract (Locale)', icon: ScanText, color: 'text-blue-500' },
@@ -293,6 +302,55 @@ export const Header: React.FC<HeaderProps> = ({
               ⌘K
             </kbd>
           </button>
+
+          {/* Theme Preset Palette Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setIsPresetOpen(!isPresetOpen)}
+              className="flex items-center gap-1.5 p-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-2xs"
+              title="Scegli tavolozza colori"
+            >
+              <Palette className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{
+                  backgroundColor:
+                    availablePresets.find((p) => p.id === preset)?.colorHex || '#10b981',
+                }}
+              />
+            </button>
+
+            {isPresetOpen && (
+              <div
+                className="absolute right-0 mt-2 w-48 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl z-50 space-y-1"
+                onMouseLeave={() => setIsPresetOpen(false)}
+              >
+                <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 px-2 py-1">
+                  Preset Tema
+                </div>
+                {availablePresets.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setPreset(p.id);
+                      setIsPresetOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                      preset === p.id
+                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.colorHex }} />
+                      <span>{p.name}</span>
+                    </div>
+                    {preset === p.id && <span className="text-emerald-500 text-xs">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Theme Toggle Button */}
           <button

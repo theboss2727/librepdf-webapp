@@ -27,6 +27,8 @@ import {
   Cpu,
   Zap,
   Sparkles,
+  Eraser,
+  ShieldCheck,
 } from 'lucide-react';
 import type { ToolId } from '../types/pdf';
 
@@ -52,6 +54,9 @@ const PDF_ORGANIZE_ITEMS: GroupedItem[] = [
 ];
 
 const PDF_EDIT_SECURITY_ITEMS: GroupedItem[] = [
+  { id: 'verify-signature', title: 'Verifica Firme & Integrità', subtitle: 'Audit PAdES e Checksum SHA-256', icon: ShieldCheck, iconColor: 'text-blue-500', badge: 'Audit' },
+  { id: 'sign-pdf', title: 'Firma & Timbro Certificato', subtitle: 'Data, ora e hash SHA-256', icon: PenTool, iconColor: 'text-emerald-500', badge: 'Certificato' },
+  { id: 'redact-pdf', title: 'Oscuramento Permanente', subtitle: 'Cancella dati sensibili e metadati', icon: Eraser, iconColor: 'text-rose-500', badge: 'Sanitizer' },
   { id: 'edit-pdf', title: 'Modifica & Firme PDF', subtitle: 'Testi, timbri e firma a mano', icon: PenTool, iconColor: 'text-rose-600' },
   { id: 'watermark', title: 'Filigrana Diagonale', subtitle: 'Timbro di riservatezza 45°', icon: Stamp, iconColor: 'text-emerald-500' },
   { id: 'page-numbers', title: 'Numerazione Pagine', subtitle: 'Inserisci numeri di pagina', icon: Hash, iconColor: 'text-indigo-500' },

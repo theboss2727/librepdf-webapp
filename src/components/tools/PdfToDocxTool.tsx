@@ -17,7 +17,8 @@ import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { getStoredApiKey, setStoredApiKey } from '../../services/freeConvertApi';
 import { convertHighFidelity, getEngineCapabilities } from '../../services/highFidelityConverter';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
 
 interface PdfToDocxToolProps {
   onSuccess: () => void;
@@ -31,7 +32,10 @@ export const PdfToDocxTool: React.FC<PdfToDocxToolProps> = ({ onSuccess }) => {
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [hasSilentEngine, setHasSilentEngine] = useState(false);
 
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { run, persist, isProcessing, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'pdf-to-docx',
+    onSuccess,
+  });
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('');
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -69,39 +73,41 @@ export const PdfToDocxTool: React.FC<PdfToDocxToolProps> = ({ onSuccess }) => {
   const handleConvert = async () => {
     if (!fileItem) return;
     setErrorMsg(null);
-    setIsProcessing(true);
     setProgress(5);
 
-    try {
-      const result = await convertHighFidelity(fileItem.file, 'docx', apiKey, (pct, msg) => {
-        setProgress(pct);
-        setStatusMsg(msg);
-      });
+    await run(
+      async () => {
+        try {
+          const result = await convertHighFidelity(fileItem.file, 'docx', apiKey, (pct, msg) => {
+            setProgress(pct);
+            setStatusMsg(msg);
+          });
 
-      setOutputName(result.outputFilename);
-      setDownloadUrl(result.downloadUrl);
-      setResultBlob(result.resultBlob);
+          setOutputName(result.outputFilename);
+          setDownloadUrl(result.downloadUrl);
+          setResultBlob(result.resultBlob);
 
-      await saveToVault({
-        toolId: 'pdf-to-docx',
-        name: result.outputFilename,
-        originalSize: fileItem.file.size,
-        resultSize: result.resultBlob.size,
-        data: result.resultBlob,
-      });
+          await persist({
+            name: result.outputFilename,
+            originalSize: fileItem.file.size,
+            resultSize: result.resultBlob.size,
+            data: result.resultBlob,
+          });
 
-      onSuccess();
-      confetti({ particleCount: 50, spread: 55 });
-    } catch (err: any) {
-      if (err.message === 'NEED_API_KEY') {
-        setShowKeyInput(true);
-        setErrorMsg('Inserisci la tua API Key di FreeConvert qui sopra per avviare la conversione 1:1.');
-      } else {
-        setErrorMsg(err.message || 'Errore durante la conversione in Word.');
-      }
-    } finally {
-      setIsProcessing(false);
-    }
+          confetti({ particleCount: 50, spread: 55 });
+        } catch (err: any) {
+          if (err?.message === 'NEED_API_KEY') {
+            setShowKeyInput(true);
+            const msg = 'Inserisci la tua API Key di FreeConvert qui sopra per avviare la conversione 1:1.';
+            setErrorMsg(msg);
+            throw new Error(msg);
+          }
+          setErrorMsg(err?.message || 'Errore durante la conversione in Word.');
+          throw err;
+        }
+      },
+      { successMessage: 'Conversione in Word completata', errorPrefix: 'Errore conversione in Word' }
+    );
   };
 
   const handleReset = () => {
@@ -284,7 +290,9 @@ export const PdfToDocxTool: React.FC<PdfToDocxToolProps> = ({ onSuccess }) => {
                 </div>
               )}
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
+
                 <button
                   disabled={isProcessing}
                   onClick={handleConvert}

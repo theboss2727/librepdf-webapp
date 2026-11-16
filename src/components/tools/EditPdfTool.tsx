@@ -27,7 +27,8 @@ import {
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { renderPageToImage, applyPdfEdits } from '../../services/pdfEngine';
-import { saveToVault } from '../../services/storageVault';
+import { useToolRunner } from '../../hooks/useToolRunner';
+import { PreviewToggle } from '../PreviewToggle';
 import type { PdfEditElement } from '../../types/pdf';
 
 interface EditPdfToolProps {
@@ -96,6 +97,11 @@ export const EditPdfTool: React.FC<EditPdfToolProps> = ({ onSuccess }) => {
   const [exportProgress, setExportProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [resultBytes, setResultBytes] = useState<number | null>(null);
+
+  const { run, persist, previewOnly, setPreviewOnly } = useToolRunner({
+    toolId: 'edit-pdf',
+    onSuccess,
+  });
 
   // Dragging & Resizing state on preview overlay
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -458,8 +464,7 @@ export const EditPdfTool: React.FC<EditPdfToolProps> = ({ onSuccess }) => {
       setResultBytes(previewPdfBytes.byteLength);
 
       const outName = `${fileItem.file.name.replace(/\.pdf$/i, '')}_modificato.pdf`;
-      await saveToVault({
-        toolId: 'edit-pdf',
+      await persist({
         name: outName,
         originalSize: fileItem.file.size,
         resultSize: previewPdfBytes.byteLength,
@@ -501,8 +506,7 @@ export const EditPdfTool: React.FC<EditPdfToolProps> = ({ onSuccess }) => {
       setResultBytes(pdfBytes.byteLength);
 
       const outName = `${fileItem.file.name.replace(/\.pdf$/i, '')}_modificato.pdf`;
-      await saveToVault({
-        toolId: 'edit-pdf',
+      await persist({
         name: outName,
         originalSize: fileItem.file.size,
         resultSize: pdfBytes.byteLength,
@@ -569,7 +573,8 @@ export const EditPdfTool: React.FC<EditPdfToolProps> = ({ onSuccess }) => {
             </div>
 
             {/* Zoom & Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <PreviewToggle previewOnly={previewOnly} onChange={setPreviewOnly} />
               <button
                 onClick={() => setZoomScale((z) => Math.max(0.6, z - 0.15))}
                 className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"

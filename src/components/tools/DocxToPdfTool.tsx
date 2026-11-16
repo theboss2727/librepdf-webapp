@@ -20,6 +20,8 @@ import { saveToVault } from '../../services/storageVault';
 
 interface DocxToPdfToolProps {
   onSuccess: () => void;
+  onOpenPythonStudio?: () => void;
+  onSwitchToCloudConverter?: () => void;
 }
 
 export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({ onSuccess }) => {
