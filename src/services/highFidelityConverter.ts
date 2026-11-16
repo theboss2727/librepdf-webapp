@@ -23,7 +23,8 @@ export async function getEngineCapabilities(forceRefresh = false): Promise<Engin
   if (!forceRefresh && cachedCaps) return cachedCaps;
   try {
     const res = await fetch(`/api/local-engine/capabilities?refresh=1&_t=${Date.now()}`);
-    if (res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
       cachedCaps = await res.json();
       return cachedCaps!;
     }

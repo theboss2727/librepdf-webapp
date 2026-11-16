@@ -7,11 +7,61 @@
 export const PYTHON_REQUIREMENTS = `pymupdf>=1.23.0
 PyQt6>=6.5.0
 pyinstaller>=6.0.0
-requests>=2.28.0
-pdf2docx>=0.5.6
-pandas>=2.0.0
+pdf2docx>=0.5.13
+docx2pdf>=0.1.8
+pdfplumber>=0.11.0
 openpyxl>=3.1.0
 pillow>=10.0.0
+pandas>=2.0.0
+requests>=2.28.0
+`;
+
+export const PYTHON_START_BAT = `@echo off
+title LibrePDF Studio - Avvio Locale
+chcp 65001 >nul
+cls
+
+echo ========================================================
+echo         LibrePDF Studio - Avvio Locale (Windows)
+echo ========================================================
+echo.
+echo [1/3] Verifica ambiente di sistema...
+
+where node >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERRORE] Node.js non trovato! Installa Node.js da https://nodejs.org/
+    pause
+    exit /b 1
+)
+
+where python >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo [OK] Rilevato %%v
+)
+
+if not exist node_modules (
+    echo.
+    echo [INFO] Installazione dipendenze node_modules...
+    call npm install
+)
+
+echo.
+echo [2/3] Avvio server locale con motore di conversione...
+start /b "" npx tsx server.ts
+
+echo.
+echo [3/3] Apertura di LibrePDF nel browser...
+timeout /t 2 /nobreak >nul
+start http://localhost:3000
+
+echo.
+echo ========================================================
+echo  LibrePDF e' attivo all'indirizzo: http://localhost:3000
+echo  - Motore locale 1:1: ATTIVO
+echo  - Elaborazione file: 100%% OFFLINE E PRIVATA SUL TUO PC
+echo ========================================================
+echo.
+pause >nul
 `;
 
 export const PYTHON_CORE_HANDLER = `"""

@@ -21,6 +21,7 @@ import {
   PYTHON_CORE_HANDLER,
   PYTHON_PYQT6_GUI,
   PYTHON_PYINSTALLER_BAT,
+  PYTHON_START_BAT,
   PYTHON_README,
   PYTHON_REQUIREMENTS,
 } from '../services/pythonCompanion';
@@ -33,7 +34,7 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [activeTab, setActiveTab] = useState<'zip' | 'main_gui' | 'handler' | 'requirements' | 'build_bat' | 'guide'>('zip');
+  const [activeTab, setActiveTab] = useState<'zip' | 'start_bat' | 'build_bat' | 'main_gui' | 'handler' | 'requirements' | 'guide'>('zip');
   const [copied, setCopied] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
@@ -78,11 +79,12 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
     setIsZipping(true);
     try {
       const zip = new JSZip();
+      zip.file('avvia-librepdf.bat', PYTHON_START_BAT);
+      zip.file('build_exe.bat', PYTHON_PYINSTALLER_BAT);
       zip.file('main.py', PYTHON_PYQT6_GUI);
       zip.file('app_gui.py', PYTHON_PYQT6_GUI);
       zip.file('pdf_handler.py', PYTHON_CORE_HANDLER);
       zip.file('requirements.txt', PYTHON_REQUIREMENTS);
-      zip.file('build_exe.bat', PYTHON_PYINSTALLER_BAT);
       zip.file('README.md', PYTHON_README);
 
       const blob = await zip.generateAsync({ type: 'blob' });
@@ -99,14 +101,16 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
 
   const getCodeContent = () => {
     switch (activeTab) {
+      case 'start_bat':
+        return PYTHON_START_BAT;
+      case 'build_bat':
+        return PYTHON_PYINSTALLER_BAT;
       case 'main_gui':
         return PYTHON_PYQT6_GUI;
       case 'handler':
         return PYTHON_CORE_HANDLER;
       case 'requirements':
         return PYTHON_REQUIREMENTS;
-      case 'build_bat':
-        return PYTHON_PYINSTALLER_BAT;
       default:
         return PYTHON_PYQT6_GUI;
     }
@@ -240,6 +244,26 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
             📦 Pacchetto Desktop (.zip)
           </button>
           <button
+            onClick={() => setActiveTab('start_bat')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              activeTab === 'start_bat'
+                ? 'bg-amber-500 text-slate-950 shadow-xs font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            🚀 avvia-librepdf.bat
+          </button>
+          <button
+            onClick={() => setActiveTab('build_bat')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              activeTab === 'build_bat'
+                ? 'bg-amber-500 text-slate-950 shadow-xs font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            ⚙️ build_exe.bat
+          </button>
+          <button
             onClick={() => setActiveTab('main_gui')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
               activeTab === 'main_gui'
@@ -268,16 +292,6 @@ export const ReservedPythonView: React.FC<ReservedPythonViewProps> = ({ onBackTo
             }`}
           >
             📦 requirements.txt
-          </button>
-          <button
-            onClick={() => setActiveTab('build_bat')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-              activeTab === 'build_bat'
-                ? 'bg-amber-500 text-slate-950 shadow-xs font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            ⚙️ build_exe.bat
           </button>
           <button
             onClick={() => setActiveTab('guide')}

@@ -318,23 +318,40 @@ export const ConversionEngineBanner: React.FC<ConversionEngineBannerProps> = ({
           </div>
         </div>
       ) : (
-        /* Scenario 3: No local Python or LibreOffice found */
+        /* Scenario 3: Remote hosting (e.g. Netlify) or No local backend found */
         <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
               <Cloud className="w-5 h-5" />
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                Configurazione Motore di Conversione
-              </h4>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
-                Per conversioni ad alta fedeltà 1:1, puoi installare <strong>Python o LibreOffice</strong> sul computer per elaborare i file 100% in locale e gratis, oppure appoggiarti a <strong>FreeConvert</strong> inserendo una chiave API.
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                  {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+                    ? 'Versione Web Cloud (Netlify / Hosting Remoto)'
+                    : 'Configurazione Motore di Conversione Locale'}
+                </h4>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800">
+                  {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+                    ? 'Cloud Engine'
+                    : 'Backend non attivo'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? (
+                  <>
+                    I siti web remoti non possono accedere direttamente al sistema operativo o a Python sul tuo PC per la sicurezza della sandbox del browser. Per convertire online da <strong>{sourceFormat.toUpperCase()}</strong> a <strong>{targetFormat.toUpperCase()}</strong> ad alta fedeltà 1:1 puoi inserire la tua API Key di <strong>FreeConvert</strong>. Se vuoi convertire 100% offline, gratis e senza limiti con il tuo Python locale, avvia LibrePDF in locale sul tuo computer.
+                  </>
+                ) : (
+                  <>
+                    Per conversioni ad alta fedeltà 1:1, puoi installare <strong>Python o LibreOffice</strong> sul computer per elaborare i file 100% in locale e gratis, oppure appoggiarti a <strong>FreeConvert</strong> inserendo una chiave API.
+                  </>
+                )}
               </p>
             </div>
           </div>
 
-          <div className="max-w-md pt-1 space-y-1.5">
+          <div className="max-w-md pt-1 space-y-2">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <input
@@ -360,6 +377,19 @@ export const ConversionEngineBanner: React.FC<ConversionEngineBannerProps> = ({
               >
                 {isKeySaved ? 'Aggiornata' : 'Salva Chiave'}
               </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-zinc-500">
+              <span>Non hai una chiave FreeConvert?</span>
+              <a
+                href="https://www.freeconvert.com/api"
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
+              >
+                <span>Crea account gratuito (750 min/mese)</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
           </div>
         </div>
