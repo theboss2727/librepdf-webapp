@@ -1,18 +1,28 @@
 import { convertFileWithFreeConvert, getStoredApiKey } from './freeConvertApi';
 
 export interface EngineCapabilities {
+  pythonInstalled: boolean;
+  pythonCmd?: string | null;
+  pythonVersion?: string;
+  libreOfficeInstalled: boolean;
   pdfToDocx: boolean;
   pdfToXlsx: boolean;
   officeToPdf: boolean;
+  hasDocx2Pdf?: boolean;
   hasServerFreeConvertKey: boolean;
+  missingPackages: string[];
 }
 
 let cachedCaps: EngineCapabilities | null = null;
 
-export async function getEngineCapabilities(): Promise<EngineCapabilities> {
-  if (cachedCaps) return cachedCaps;
+export function refreshEngineCapabilities(): void {
+  cachedCaps = null;
+}
+
+export async function getEngineCapabilities(forceRefresh = false): Promise<EngineCapabilities> {
+  if (!forceRefresh && cachedCaps) return cachedCaps;
   try {
-    const res = await fetch('/api/local-engine/capabilities');
+    const res = await fetch(`/api/local-engine/capabilities?refresh=1&_t=${Date.now()}`);
     if (res.ok) {
       cachedCaps = await res.json();
       return cachedCaps!;
@@ -21,11 +31,29 @@ export async function getEngineCapabilities(): Promise<EngineCapabilities> {
     // Fallback if static hosting without backend
   }
   return {
+    pythonInstalled: false,
+    libreOfficeInstalled: false,
     pdfToDocx: false,
     pdfToXlsx: false,
     officeToPdf: false,
     hasServerFreeConvertKey: false,
+    missingPackages: [],
   };
+}
+
+export async function installLocalPackages(): Promise<{ success: boolean; capabilities: EngineCapabilities }> {
+  cachedCaps = null;
+  const res = await fetch('/api/local-engine/install-packages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Errore installazione risorse locali');
+  }
+  const data = await res.json();
+  cachedCaps = data.capabilities;
+  return data;
 }
 
 export function isLocalEngineCapable(
@@ -52,13 +80,14 @@ export async function convertHighFidelity(
   apiKeyInput?: string,
   onProgress?: (progress: number, statusMsg: string) => void
 ): Promise<{ downloadUrl: string; resultBlob: Blob; outputFilename: string; usedLocalBackend: boolean }> {
-  const caps = await getEngineCapabilities();
+  // Always query live capabilities to ensure newly installed packages are immediately used
+  const caps = await getEngineCapabilities(true);
   const baseName = file.name.replace(/\.[^.]+$/, '') || file.name;
   const outputFilename = `${baseName}.${targetFormat}`;
 
   // 1. Try under-the-hood Python/LibreOffice backend if installed on host
   if (isLocalEngineCapable(caps, file.name, targetFormat)) {
-    onProgress?.(20, 'Elaborazione documento ad alta fedeltà...');
+    onProgress?.(20, 'Elaborazione con motore locale nativo ad alta fedeltà...');
     const res = await fetch('/api/local-engine/convert', {
       method: 'POST',
       headers: {
@@ -80,6 +109,9 @@ export async function convertHighFidelity(
         outputFilename,
         usedLocalBackend: true,
       };
+    } else {
+      const errJson = await res.json().catch(() => null);
+      throw new Error(errJson?.error || `Errore motore locale (${res.status}): conversione non riuscita.`);
     }
   }
 
@@ -88,6 +120,9 @@ export async function convertHighFidelity(
   const effectiveKey = clientKey || (caps.hasServerFreeConvertKey ? '__SERVER_PROVIDED__' : '');
 
   if (!effectiveKey) {
+    if (caps.pythonInstalled && caps.missingPackages.length > 0) {
+      throw new Error(`Le librerie Python per questo formato (${caps.missingPackages.join(', ')}) non risultano ancora caricate nel motore. Clicca su 'Ricarica Diagnostica' o 'Installa Risorse Interne' sopra.`);
+    }
     throw new Error('NEED_API_KEY');
   }
 

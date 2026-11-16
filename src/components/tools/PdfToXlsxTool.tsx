@@ -15,10 +15,11 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
-import { getStoredApiKey, setStoredApiKey } from '../../services/freeConvertApi';
-import { convertHighFidelity, getEngineCapabilities } from '../../services/highFidelityConverter';
+import { getStoredApiKey } from '../../services/freeConvertApi';
+import { convertHighFidelity } from '../../services/highFidelityConverter';
 import { useToolRunner } from '../../hooks/useToolRunner';
 import { PreviewToggle } from '../PreviewToggle';
+import { ConversionEngineBanner } from '../ConversionEngineBanner';
 
 interface PdfToXlsxToolProps {
   onSuccess: () => void;
@@ -26,11 +27,7 @@ interface PdfToXlsxToolProps {
 
 export const PdfToXlsxTool: React.FC<PdfToXlsxToolProps> = ({ onSuccess }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [isKeySaved, setIsKeySaved] = useState(false);
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [hasSilentEngine, setHasSilentEngine] = useState(false);
+  const [apiKey, setApiKey] = useState(getStoredApiKey());
 
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('');
@@ -45,31 +42,6 @@ export const PdfToXlsxTool: React.FC<PdfToXlsxToolProps> = ({ onSuccess }) => {
   });
 
   const fileItem = files[0];
-
-  useEffect(() => {
-    const saved = getStoredApiKey();
-    if (saved) {
-      setApiKey(saved);
-      setIsKeySaved(true);
-    }
-
-    getEngineCapabilities().then((caps) => {
-      const autoReady = caps.pdfToXlsx || caps.hasServerFreeConvertKey;
-      setHasSilentEngine(autoReady);
-      if (!autoReady && !saved) {
-        setShowKeyInput(true);
-      }
-    });
-  }, []);
-
-  const handleSaveApiKey = () => {
-    setStoredApiKey(apiKey);
-    setIsKeySaved(!!apiKey.trim());
-    if (apiKey.trim()) {
-      setShowKeyInput(false);
-      setErrorMsg(null);
-    }
-  };
 
   const handleConvert = async () => {
     if (!fileItem) return;
@@ -98,8 +70,7 @@ export const PdfToXlsxTool: React.FC<PdfToXlsxToolProps> = ({ onSuccess }) => {
           confetti({ particleCount: 50, spread: 55 });
         } catch (err: any) {
           if (err?.message === 'NEED_API_KEY') {
-            setShowKeyInput(true);
-            const msg = 'Inserisci la tua API Key di FreeConvert qui sopra per avviare la conversione 1:1.';
+            const msg = 'È richiesta una API Key di FreeConvert oppure l\'attivazione delle risorse locali per avviare la conversione.';
             setErrorMsg(msg);
             throw new Error(msg);
           }
@@ -145,71 +116,13 @@ export const PdfToXlsxTool: React.FC<PdfToXlsxToolProps> = ({ onSuccess }) => {
         </div>
       </div>
 
-      {(!hasSilentEngine || showKeyInput) && (
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Key className="w-4 h-4 text-sky-500" />
-              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                Motore Alta Fedeltà (FreeConvert)
-              </span>
-              {isKeySaved && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                  <Check className="w-3 h-3" /> Attivo
-                </span>
-              )}
-            </div>
-            <button
-              onClick={() => setShowKeyInput(!showKeyInput)}
-              className="text-xs text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
-            >
-              {showKeyInput ? 'Nascondi' : 'Configura chiave API'}
-            </button>
-          </div>
-
-          {showKeyInput && (
-            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Inserisci una volta la tua API Key gratuita di FreeConvert (750 conversioni/mese).
-              </p>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type={showApiKey ? 'text' : 'password'}
-                    placeholder="Incolla qui la tua API Key di FreeConvert..."
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full px-3 py-2 pr-10 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-hidden focus:border-sky-500 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
-                  >
-                    {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSaveApiKey}
-                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold cursor-pointer transition shadow-xs"
-                >
-                  Salva
-                </button>
-              </div>
-              <a
-                href="https://www.freeconvert.com/api"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 hover:underline"
-              >
-                <span>Ottieni gratis la tua API Key su FreeConvert</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Engine Selection & Diagnostic Banner */}
+      <ConversionEngineBanner
+        sourceFormat="pdf"
+        targetFormat="xlsx"
+        onApiKeyChange={setApiKey}
+        currentApiKey={apiKey}
+      />
 
       {downloadUrl ? (
         <div className="text-center py-8 space-y-5 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200 dark:border-emerald-800 p-6 sm:p-8">
