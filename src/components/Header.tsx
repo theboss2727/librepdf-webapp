@@ -33,6 +33,7 @@ import {
   Palette,
   Eraser,
   ShieldCheck,
+  BookOpen,
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useThemePreset } from '../context/ThemePresetProvider';
@@ -49,6 +50,7 @@ interface HeaderProps {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onQuickSearchClick?: () => void;
+  onOpenManual?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -61,6 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   onToggleTheme,
   onQuickSearchClick,
+  onOpenManual,
 }) => {
   const [openMenu, setOpenMenu] = useState<'pdf' | 'convert' | null>(null);
   const [isPresetOpen, setIsPresetOpen] = useState(false);
@@ -302,6 +305,18 @@ export const Header: React.FC<HeaderProps> = ({
               ⌘K
             </kbd>
           </button>
+
+          {/* Manuale d'Uso Button */}
+          {onOpenManual && (
+            <button
+              onClick={onOpenManual}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold transition cursor-pointer shadow-2xs"
+              title="Consulta il Manuale d'Uso completo di LibrePDF"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-rose-500" />
+              <span className="hidden sm:inline">Manuale</span>
+            </button>
+          )}
 
           {/* Theme Preset Palette Selector */}
           <div className="relative">

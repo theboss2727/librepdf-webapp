@@ -18,6 +18,7 @@ interface CommandPaletteProps {
   onSelectTool: (id: ToolId) => void;
   onOpenPythonStudio: () => void;
   onOpenVault: () => void;
+  onOpenManual?: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -26,6 +27,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onSelectTool,
   onOpenPythonStudio,
   onOpenVault,
+  onOpenManual,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -108,6 +110,34 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
         {/* Results List */}
         <div className="max-h-80 overflow-y-auto p-2 divide-y divide-slate-100 dark:divide-slate-800/60">
+          {onOpenManual && (!query || 'manuale guida istruzioni faq help info'.includes(query.toLowerCase())) && (
+            <div
+              onClick={() => {
+                onClose();
+                onOpenManual();
+              }}
+              className="flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/40 text-rose-900 dark:text-rose-100"
+            >
+              <div className="flex items-center gap-3 min-w-0 pr-2">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+                  <Command className="w-4 h-4 text-rose-600" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold truncate">📖 Manuale d'Uso LibrePDF Studio</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-200 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200 font-bold">
+                      Guida Ufficiale
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-rose-700 dark:text-rose-300 truncate">
+                    Consulta la guida completa all'uso di tutti i 20+ strumenti, firme SHA-256 e motore locale
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+            </div>
+          )}
+
           {filtered.length === 0 ? (
             <div className="py-8 text-center text-xs text-slate-500">
               Nessuno strumento trovato per "{query}"

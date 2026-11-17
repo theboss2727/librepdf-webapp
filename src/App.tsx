@@ -61,12 +61,14 @@ const VaultModal = lazy(() => import('./components/VaultModal').then((m) => ({ d
 const SignPdfTool = lazy(() => import('./components/tools/SignPdfTool').then((m) => ({ default: m.SignPdfTool })));
 const RedactPdfTool = lazy(() => import('./components/tools/RedactPdfTool').then((m) => ({ default: m.RedactPdfTool })));
 const VerifySignatureTool = lazy(() => import('./components/tools/VerifySignatureTool').then((m) => ({ default: m.VerifySignatureTool })));
+const UserManualModal = lazy(() => import('./components/UserManualModal').then((m) => ({ default: m.UserManualModal })));
 
 export default function App() {
   const { theme, toggleTheme } = useStudioTheme();
   const [selectedToolId, setSelectedToolId] = useState<ToolId | null>(null);
   const [isPythonStudioOpen, setIsPythonStudioOpen] = useState(false);
   const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [isUserManualOpen, setIsUserManualOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [vaultCount, setVaultCount] = useState(0);
   const [cloudSyncActive, setCloudSyncActive] = useState(false);
@@ -132,6 +134,7 @@ export default function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onQuickSearchClick={() => setIsCommandPaletteOpen(true)}
+          onOpenManual={() => setIsUserManualOpen(true)}
         />
 
         {/* Main viewport */}
@@ -320,7 +323,11 @@ export default function App() {
         </main>
 
         {/* Footer */}
-        <Footer onOpenPythonStudio={() => setIsPythonStudioOpen(true)} onOpenVault={() => setIsVaultOpen(true)} />
+        <Footer
+          onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
+          onOpenVault={() => setIsVaultOpen(true)}
+          onOpenManual={() => setIsUserManualOpen(true)}
+        />
 
         {/* Command Palette */}
         <CommandPalette
@@ -329,6 +336,7 @@ export default function App() {
           onSelectTool={handleSelectTool}
           onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
           onOpenVault={() => setIsVaultOpen(true)}
+          onOpenManual={() => setIsUserManualOpen(true)}
         />
 
         {/* Offline Indicator */}
@@ -345,6 +353,12 @@ export default function App() {
             isOpen={isVaultOpen}
             onClose={() => setIsVaultOpen(false)}
             onItemUpdated={refreshVaultStats}
+          />
+          <UserManualModal
+            isOpen={isUserManualOpen}
+            onClose={() => setIsUserManualOpen(false)}
+            onOpenPythonStudio={() => setIsPythonStudioOpen(true)}
+            onOpenVault={() => setIsVaultOpen(true)}
           />
         </Suspense>
 

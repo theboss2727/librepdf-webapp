@@ -5,16 +5,19 @@ import {
   Terminal,
   Cpu,
   Lock,
+  BookOpen,
 } from 'lucide-react';
 
 interface FooterProps {
   onOpenPythonStudio: () => void;
   onOpenVault: () => void;
+  onOpenManual?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onOpenPythonStudio,
   onOpenVault,
+  onOpenManual,
 }) => {
   return (
     <footer className="mt-20 border-t border-slate-200/90 dark:border-slate-800 py-10 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-950 transition-colors">
@@ -29,12 +32,24 @@ export const Footer: React.FC<FooterProps> = ({
               <span className="text-[11px] text-slate-500">Motore Client-Side</span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-lg leading-relaxed">
-              Elaborazione documenti eseguita interamente in memoria sandbox locale tramite WebAssembly e TypedArrays. 
+              Elaborazione documenti eseguita interamente in memoria sandbox locale tramite WebAssembly e TypedArrays.
               Nessun dato viene inviato a server esterni per garantire privacy assoluta.
             </p>
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-medium">
+          <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
+            {onOpenManual && (
+              <>
+                <button
+                  onClick={onOpenManual}
+                  className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center gap-1 font-semibold"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Manuale d'Uso Completo</span>
+                </button>
+                <span className="text-slate-300 dark:text-slate-700">·</span>
+              </>
+            )}
             <button
               onClick={onOpenPythonStudio}
               className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center gap-1 font-semibold"

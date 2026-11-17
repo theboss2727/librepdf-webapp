@@ -133,6 +133,92 @@ class PDFHandler:
                     df_empty.to_excel(writer, sheet_name="Info", index=False)
             return output_path
 
+    @staticmethod
+    def convert_excel_to_pdf(excel_path: str, output_path: str):
+        """
+        Converte un file Excel (.xlsx, .xls, .csv) in PDF.
+        Strategia 1: Excel COM nativo (se installato Microsoft Office)
+        Strategia 2: Motore grafico PyMuPDF Story ad alta fedelta' (100% offline, nessun Office richiesto)
+        """
+        import html
+        lower = excel_path.lower()
+        converted = False
+        try:
+            import win32com.client
+            xl = win32com.client.Dispatch("Excel.Application")
+            xl.Visible = False
+            xl.DisplayAlerts = False
+            try:
+                wb = xl.Workbooks.Open(os.path.abspath(excel_path))
+                wb.ExportAsFixedFormat(0, os.path.abspath(output_path))
+                wb.Close(False)
+                converted = True
+            finally:
+                xl.Quit()
+        except Exception:
+            converted = False
+
+        if not converted or not os.path.exists(output_path):
+            html_parts = ["""<style>
+            body { font-family: sans-serif; margin: 20px; color: #1e293b; }
+            h2 { color: #0f172a; margin-top: 15px; margin-bottom: 8px; font-size: 13pt; border-bottom: 2px solid #3b82f6; padding-bottom: 4px; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 25px; table-layout: auto; }
+            th { background-color: #f1f5f9; color: #0f172a; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px; font-size: 9pt; text-align: left; }
+            td { border: 1px solid #cbd5e1; padding: 5px 8px; font-size: 8.5pt; text-align: left; vertical-align: top; }
+            tr:nth-child(even) td { background-color: #f8fafc; }
+            .empty { color: #94a3b8; font-style: italic; }
+            </style>"""]
+
+            if lower.endswith(('.xlsx', '.xlsm')):
+                import openpyxl
+                wb = openpyxl.load_workbook(excel_path, data_only=True)
+                has_content = False
+                for sname in wb.sheetnames:
+                    ws = wb[sname]
+                    rows = list(ws.iter_rows(values_only=True))
+                    non_empty = [r for r in rows if any(c is not None and str(c).strip() != "" for c in r)]
+                    if not non_empty:
+                        continue
+                    has_content = True
+                    html_parts.append(f"<h2>Foglio: {html.escape(sname)}</h2><table>")
+                    for r_idx, row in enumerate(non_empty):
+                        html_parts.append("<tr>")
+                        for val in row:
+                            tag = "th" if r_idx == 0 else "td"
+                            val_str = "" if val is None else str(val)
+                            html_parts.append(f"<{tag}>{html.escape(val_str)}</{tag}>")
+                        html_parts.append("</tr>")
+                    html_parts.append("</table>")
+                if not has_content:
+                    html_parts.append("<p class='empty'>Nessun dato trovato nel foglio Excel.</p>")
+            elif lower.endswith('.csv'):
+                import csv
+                html_parts.append("<h2>Tabella CSV</h2><table>")
+                with open(excel_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    reader = csv.reader(f)
+                    for r_idx, row in enumerate(reader):
+                        if not any(row): continue
+                        html_parts.append("<tr>")
+                        for val in row:
+                            tag = "th" if r_idx == 0 else "td"
+                            val_str = "" if val is None else str(val)
+                            html_parts.append(f"<{tag}>{html.escape(val_str)}</{tag}>")
+                        html_parts.append("</tr>")
+                html_parts.append("</table>")
+
+            full_html = "".join(html_parts)
+            story = pymupdf.Story(html=full_html)
+            writer = pymupdf.DocumentWriter(output_path)
+            more = 1
+            while more:
+                device = writer.begin_page(pymupdf.Rect(0, 0, 842, 595)) # A4 Landscape
+                more, _ = story.place(pymupdf.Rect(35, 35, 807, 560))
+                story.draw(device)
+                writer.end_page()
+            writer.close()
+
+        return output_path
+
     # ------------------- MODIFICA PDF (TESTI, IMMAGINI, TIMBRI) -------------------
 
     def insert_custom_text(

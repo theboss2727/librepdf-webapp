@@ -7,6 +7,8 @@ export interface EngineCapabilities {
   libreOfficeInstalled: boolean;
   pdfToDocx: boolean;
   pdfToXlsx: boolean;
+  docxToPdf?: boolean;
+  xlsxToPdf?: boolean;
   officeToPdf: boolean;
   hasDocx2Pdf?: boolean;
   hasServerFreeConvertKey: boolean;
@@ -66,7 +68,11 @@ export function isLocalEngineCapable(
   const fmt = targetFormat.toLowerCase();
   if (lower.endsWith('.pdf') && fmt === 'docx') return caps.pdfToDocx;
   if (lower.endsWith('.pdf') && fmt === 'xlsx') return caps.pdfToXlsx;
-  if (fmt === 'pdf' && /\.(docx?|xlsx?|csv|odt|ods|pptx?|rtf)$/.test(lower)) return caps.officeToPdf;
+  if (fmt === 'pdf') {
+    if (/\.(docx?|doc)$/.test(lower)) return caps.docxToPdf ?? caps.officeToPdf;
+    if (/\.(xlsx?|xls|csv|ods|xlsm)$/.test(lower)) return caps.xlsxToPdf ?? caps.officeToPdf;
+    return caps.officeToPdf;
+  }
   return false;
 }
 
