@@ -319,79 +319,85 @@ export const ConversionEngineBanner: React.FC<ConversionEngineBannerProps> = ({
         </div>
       ) : (
         /* Scenario 3: Remote hosting (e.g. Netlify) or No local backend found */
-        <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
-              <Cloud className="w-5 h-5" />
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                  {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-                    ? 'Versione Web Cloud (Netlify / Hosting Remoto)'
-                    : 'Configurazione Motore di Conversione Locale'}
-                </h4>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800">
-                  {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-                    ? 'Cloud Engine'
-                    : 'Backend non attivo'}
-                </span>
+        <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0 mt-0.5 sm:mt-0">
+                <Cpu className="w-5 h-5" />
               </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? (
-                  <>
-                    I siti web remoti non possono accedere direttamente al sistema operativo o a Python sul tuo PC per la sicurezza della sandbox del browser. Per convertire online da <strong>{sourceFormat.toUpperCase()}</strong> a <strong>{targetFormat.toUpperCase()}</strong> ad alta fedeltà 1:1 puoi inserire la tua API Key di <strong>FreeConvert</strong>. Se vuoi convertire 100% offline, gratis e senza limiti con il tuo Python locale, avvia LibrePDF in locale sul tuo computer.
-                  </>
-                ) : (
-                  <>
-                    Per conversioni ad alta fedeltà 1:1, puoi installare <strong>Python o LibreOffice</strong> sul computer per elaborare i file 100% in locale e gratis, oppure appoggiarti a <strong>FreeConvert</strong> inserendo una chiave API.
-                  </>
-                )}
-              </p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                    Motore Client-Side nel Browser (100% Locale)
+                  </h4>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800">
+                    Zero Server • Nessuna Chiave Richiesta
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-800/90 dark:text-emerald-300/80">
+                  La conversione da <strong>{sourceFormat.toUpperCase()}</strong> a <strong>{targetFormat.toUpperCase()}</strong> avverrà direttamente all'interno del tuo browser sul tuo dispositivo tramite WebAssembly e JavaScript. Nessun file o dato lascerà mai il tuo computer.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="max-w-md pt-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type={showKeyPassword ? 'text' : 'password'}
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Incolla API Key FreeConvert"
-                  className="w-full text-xs pl-8 pr-8 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono"
-                />
-                <Key className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2.5" />
-                <button
-                  type="button"
-                  onClick={() => setShowKeyPassword(!showKeyPassword)}
-                  className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-600"
-                >
-                  {showKeyPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+            <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
               <button
                 type="button"
-                onClick={handleSaveApiKey}
-                className="px-3.5 py-2 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs hover:bg-zinc-800 transition cursor-pointer"
+                onClick={() => setShowCloudSettings(!showCloudSettings)}
+                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
-                {isKeySaved ? 'Aggiornata' : 'Salva Chiave'}
+                <span>{showCloudSettings ? 'Nascondi opzioni Cloud' : 'Opzioni Cloud FreeConvert (Opzionali)'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCloudSettings ? 'rotate-180' : ''}`} />
               </button>
             </div>
-
-            <div className="flex items-center justify-between text-[11px] text-zinc-500">
-              <span>Non hai una chiave FreeConvert?</span>
-              <a
-                href="https://www.freeconvert.com/api"
-                target="_blank"
-                rel="noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
-              >
-                <span>Crea account gratuito (750 min/mese)</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
           </div>
+
+          {showCloudSettings && (
+            <div className="mt-3.5 pt-3.5 border-t border-emerald-200/60 dark:border-emerald-900/40 text-xs space-y-2">
+              <p className="text-zinc-600 dark:text-zinc-400 text-[11px]">
+                Il motore nel browser elabora già tutto gratis sul tuo PC. Se desideri appoggiarti facoltativamente al cloud di FreeConvert per la fedeltà 1:1 di Microsoft Office su server remoti, puoi inserire la tua chiave API qui:
+              </p>
+              <div className="flex items-center gap-2 max-w-md">
+                <div className="relative flex-1">
+                  <input
+                    type={showKeyPassword ? 'text' : 'password'}
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder="Incolla API Key FreeConvert opzionale"
+                    className="w-full text-xs pl-8 pr-8 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono"
+                  />
+                  <Key className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2.5" />
+                  <button
+                    type="button"
+                    onClick={() => setShowKeyPassword(!showKeyPassword)}
+                    className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-600"
+                  >
+                    {showKeyPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveApiKey}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  {isKeySaved ? 'Salvata' : 'Salva'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
+                <span>Vuoi una chiave FreeConvert?</span>
+                <a
+                  href="https://www.freeconvert.com/api"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
+                >
+                  <span>Crea account gratuito (750 min/mese)</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,4 +1,11 @@
 import { convertFileWithFreeConvert, getStoredApiKey } from './freeConvertApi';
+import {
+  convertDocxToPdf,
+  convertPagesToPdf,
+  convertXlsxToPdf,
+  convertPdfToDocx,
+  convertPdfToXlsx,
+} from './officeConverters';
 
 export interface EngineCapabilities {
   pythonInstalled: boolean;
@@ -122,20 +129,62 @@ export async function convertHighFidelity(
     }
   }
 
-  // 2. High-Fidelity Cloud Engine (FreeConvert 1:1)
+  // 2. High-Fidelity Cloud Engine (FreeConvert 1:1) - only if user provides an API key
   const clientKey = (apiKeyInput ?? getStoredApiKey()).trim();
   const effectiveKey = clientKey || (caps.hasServerFreeConvertKey ? '__SERVER_PROVIDED__' : '');
 
-  if (!effectiveKey) {
-    if (caps.pythonInstalled && caps.missingPackages.length > 0) {
-      throw new Error(`Le librerie Python per questo formato (${caps.missingPackages.join(', ')}) non risultano ancora caricate nel motore. Clicca su 'Ricarica Diagnostica' o 'Installa Risorse Interne' sopra.`);
-    }
-    throw new Error('NEED_API_KEY');
+  if (effectiveKey) {
+    const cloudResult = await convertFileWithFreeConvert(file, targetFormat, effectiveKey, onProgress);
+    return {
+      ...cloudResult,
+      usedLocalBackend: false,
+    };
   }
 
-  const cloudResult = await convertFileWithFreeConvert(file, targetFormat, effectiveKey, onProgress);
+  // 3. 100% In-Browser Client-Side Engine (WebAssembly & JS)
+  // Zero Install, Zero External Network, Zero API Key required.
+  // Works seamlessly for every visitor on Netlify, mobile, macOS, Linux, and Windows!
+  onProgress?.(25, 'Conversione locale nel browser in corso (Zero Server)...');
+  const buffer = await file.arrayBuffer();
+  let resultData: Uint8Array | Blob;
+  const lowerName = file.name.toLowerCase();
+
+  if (targetFormat === 'pdf') {
+    if (lowerName.endsWith('.pages')) {
+      resultData = await convertPagesToPdf(buffer, onProgress);
+    } else if (/\.(xlsx?|xls|csv|numbers|ods)$/.test(lowerName)) {
+      resultData = await convertXlsxToPdf(buffer, { orientation: 'landscape' }, onProgress);
+    } else {
+      resultData = await convertDocxToPdf(buffer, onProgress);
+    }
+  } else if (targetFormat === 'docx') {
+    resultData = await convertPdfToDocx(buffer, {}, onProgress);
+  } else if (targetFormat === 'xlsx') {
+    const xlsxRes = await convertPdfToXlsx(buffer, onProgress);
+    resultData = xlsxRes.workbookBytes;
+  } else {
+    throw new Error('Formato non supportato dal motore locale del browser.');
+  }
+
+  const resultBlob =
+    resultData instanceof Blob
+      ? resultData
+      : new Blob([resultData as BlobPart], {
+          type:
+            targetFormat === 'pdf'
+              ? 'application/pdf'
+              : targetFormat === 'docx'
+              ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+
+  const downloadUrl = URL.createObjectURL(resultBlob);
+  onProgress?.(100, 'Conversione 100% locale completata con successo!');
+
   return {
-    ...cloudResult,
-    usedLocalBackend: false,
+    downloadUrl,
+    resultBlob,
+    outputFilename,
+    usedLocalBackend: true,
   };
 }

@@ -348,11 +348,12 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 space-y-3">
               <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-bold">
                 <Laptop className="w-4 h-4 text-emerald-500" />
-                <span>Esperienza Desktop PWA (0 MB, Avvio Istantaneo)</span>
+                <span>App Desktop Standalone (Senza Finestre Nere, 0 MB)</span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Invece di pesanti file .exe, LibrePDF si installa in 1 clic da Chrome o Edge tramite il pulsante <strong>"Installa Desktop"</strong> nell'header.
-                Viene creata un'icona sul Desktop e nella barra delle applicazioni, aprendosi come finestra autonoma ultra-leggera che funziona 100% offline.
+                1. Fai doppio clic su <code>crea-collegamento-desktop.bat</code> per posizionare l'icona sul tuo Desktop.<br />
+                2. Fai doppio clic sull'icona <strong>LibrePDF</strong>: avvia il server in background in modo totalmente invisibile e apre l'applicazione in una finestra autonoma nativa.<br />
+                3. Per arrestare il server in background quando hai terminato, fai doppio clic su <code>arresta-desktop.bat</code>.
               </p>
             </div>
 
@@ -362,9 +363,9 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
                 <span>Motore Locale 1:1 con 1 Clic (`avvia-librepdf.bat`)</span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                1. Fai doppio clic sul file <code>avvia-librepdf.bat</code> nella cartella principale.<br />
+                1. Fai doppio clic sul file <code>avvia-librepdf.bat</code> nella cartella principale se preferisci vedere il log di avvio nel terminale.<br />
                 2. Lo script rileva automaticamente Python e Microsoft Office/LibreOffice.<br />
-                3. Avvia il server privato locale in background e apre LibrePDF.<br />
+                3. Avvia il server privato locale e apre LibrePDF nel tuo browser predefinito.<br />
                 4. Tutte le conversioni Word ed Excel avverranno a costo zero e senza inviare alcun file a internet.
               </p>
             </div>
