@@ -150,6 +150,33 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
 
               <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-1.5 md:col-span-2">
                 <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">⚖️ Confronta 2 PDF (Visual & Text Diff)</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Carica due versioni di uno stesso documento per visualizzare differenze affiancate, testo aggiunto (in verde) e rimosso (in rosso), con report scaricabile in Markdown.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">🔓 Sblocca PDF</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Rimuovi la cifratura e la password da documenti protetti di cui conosci la chiave per archiviarli, consultarli o stamparli liberamente.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">🏷️ Metadati & Privacy Sanitizer</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Ispeziona ed edita Titolo, Autore e software del file, oppure applica la sanificazione 1-clic per cancellare traccianti e informazioni riservate prima dell'invio.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-1.5 md:col-span-2">
+                <div className="flex items-center gap-2">
                   <span className="font-bold text-slate-900 dark:text-slate-100">📋 Tavolo di Montaggio (Organizza Pagine)</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -320,36 +347,25 @@ export const UserManualModal: React.FC<UserManualModalProps> = ({
 
             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 space-y-3">
               <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-bold">
-                <Terminal className="w-4 h-4 text-blue-500" />
-                <span>Avvio con 1 Clic (`avvia-librepdf.bat`)</span>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                1. Fai doppio clic su <code>avvia-librepdf.bat</code>.<br />
-                2. Lo script verifica automaticamente che Node.js e Python siano presenti.<br />
-                3. Avvia il server interno in background e apre il tuo browser su <code>http://localhost:3000</code>.<br />
-                4. Tutte le conversioni Word ed Excel avverranno istantaneamente tramite le risorse del tuo PC.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 space-y-3">
-              <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-bold">
-                <Cpu className="w-4 h-4 text-purple-500" />
-                <span>Compilatore Eseguibile Windows (.EXE con PyInstaller)</span>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                Se desideri un'applicazione desktop autonoma senza aprire terminali o browser:
-                fai doppio clic su <code>area-riservata/build_exe.bat</code>.
-                Troverai l'eseguibile compilato in <code>dist/LibrePdf/LibrePdf.exe</code>.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 space-y-3">
-              <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-bold">
                 <Laptop className="w-4 h-4 text-emerald-500" />
-                <span>Installazione come PWA Desktop (Chrome / Edge)</span>
+                <span>Esperienza Desktop PWA (0 MB, Avvio Istantaneo)</span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Quando l'app è aperta nel browser, clicca sull'icona <strong>"Installa LibrePDF"</strong> nella barra degli indirizzi in alto a destra. L'applicazione verrà aggiunta al Menu Start e sul Desktop di Windows come app a finestra autonoma.
+                Invece di pesanti file .exe, LibrePDF si installa in 1 clic da Chrome o Edge tramite il pulsante <strong>"Installa Desktop"</strong> nell'header.
+                Viene creata un'icona sul Desktop e nella barra delle applicazioni, aprendosi come finestra autonoma ultra-leggera che funziona 100% offline.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-bold">
+                <Terminal className="w-4 h-4 text-blue-500" />
+                <span>Motore Locale 1:1 con 1 Clic (`avvia-librepdf.bat`)</span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                1. Fai doppio clic sul file <code>avvia-librepdf.bat</code> nella cartella principale.<br />
+                2. Lo script rileva automaticamente Python e Microsoft Office/LibreOffice.<br />
+                3. Avvia il server privato locale in background e apre LibrePDF.<br />
+                4. Tutte le conversioni Word ed Excel avverranno a costo zero e senza inviare alcun file a internet.
               </p>
             </div>
           </div>

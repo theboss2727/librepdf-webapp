@@ -1489,3 +1489,107 @@ export async function inspectPdfSignatures(file: File): Promise<PdfSignatureInsp
   };
 }
 
+/**
+ * Remove password / decrypt an encrypted PDF document
+ * 100% Client-side with pdfjsLib & pdf-lib
+ */
+export async function unlockPdf(file: File, password: string): Promise<Uint8Array> {
+  const buffer = await file.arrayBuffer();
+  try {
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(buffer),
+      password,
+    });
+    const pdfDoc = await loadingTask.promise;
+    
+    // In modern pdfjs-dist, saveDocument() returns the decrypted document stream
+    if (typeof (pdfDoc as any).saveDocument === 'function') {
+      const data = await (pdfDoc as any).saveDocument();
+      if (data && data.length > 0) {
+        return data;
+      }
+    }
+
+    // High-fidelity fallback reconstruction
+    const numPages = pdfDoc.numPages;
+    const unlockedDoc = await PDFDocument.create();
+
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        await page.render({ canvasContext: ctx, viewport } as any).promise;
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgBytes = dataUrlToUint8Array(imgData);
+        const embeddedImg = await unlockedDoc.embedJpg(imgBytes);
+        const newPage = unlockedDoc.addPage([page.view[2] - page.view[0], page.view[3] - page.view[1]]);
+        newPage.drawImage(embeddedImg, {
+          x: 0,
+          y: 0,
+          width: newPage.getWidth(),
+          height: newPage.getHeight(),
+        });
+      }
+    }
+
+    return await unlockedDoc.save();
+  } catch (err: any) {
+    if (
+      err?.name === 'PasswordException' ||
+      err?.message?.toLowerCase().includes('password') ||
+      err?.message?.toLowerCase().includes('decrypt')
+    ) {
+      throw new Error('Password non corretta. Verifica la chiave e riprova.');
+    }
+    throw new Error(err?.message || 'Impossibile sbloccare il documento.');
+  }
+}
+
+export interface PdfMetadataPayload {
+  title?: string;
+  author?: string;
+  subject?: string;
+  keywords?: string[];
+  creator?: string;
+  producer?: string;
+}
+
+/**
+ * Update or strip PDF metadata
+ * 100% Client-side with pdf-lib
+ */
+export async function updatePdfMetadata(
+  file: File,
+  metadata: PdfMetadataPayload,
+  stripAll = false
+): Promise<Uint8Array> {
+  const buffer = await file.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+
+  if (stripAll) {
+    pdfDoc.setTitle('');
+    pdfDoc.setAuthor('');
+    pdfDoc.setSubject('');
+    pdfDoc.setKeywords([]);
+    pdfDoc.setProducer('');
+    pdfDoc.setCreator('');
+    pdfDoc.setCreationDate(new Date(0));
+    pdfDoc.setModificationDate(new Date(0));
+  } else {
+    if (metadata.title !== undefined) pdfDoc.setTitle(metadata.title);
+    if (metadata.author !== undefined) pdfDoc.setAuthor(metadata.author);
+    if (metadata.subject !== undefined) pdfDoc.setSubject(metadata.subject);
+    if (metadata.keywords !== undefined) pdfDoc.setKeywords(metadata.keywords);
+    if (metadata.creator !== undefined) pdfDoc.setCreator(metadata.creator);
+    if (metadata.producer !== undefined) pdfDoc.setProducer(metadata.producer);
+    pdfDoc.setModificationDate(new Date());
+  }
+
+  return await pdfDoc.save();
+}
+
+

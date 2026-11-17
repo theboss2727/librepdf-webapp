@@ -29,6 +29,9 @@ import {
   Sparkles,
   Eraser,
   ShieldCheck,
+  GitCompare,
+  Unlock,
+  Tag,
 } from 'lucide-react';
 import type { ToolId } from '../types/pdf';
 
@@ -49,6 +52,7 @@ interface GroupedItem {
 const PDF_ORGANIZE_ITEMS: GroupedItem[] = [
   { id: 'merge', title: 'Unisci PDF', subtitle: 'Combina più PDF in uno', icon: Files, iconColor: 'text-rose-500' },
   { id: 'split', title: 'Dividi & Ritaglia', subtitle: 'Estrai pagine o intervalli', icon: Scissors, iconColor: 'text-amber-500' },
+  { id: 'compare-pdf', title: 'Confronta 2 PDF', subtitle: 'Visual Diff & differenze testo', icon: GitCompare, iconColor: 'text-indigo-500', badge: 'Novità' },
   { id: 'organize', title: 'Tavolo di Montaggio', subtitle: 'Riordina ed elimina pagine', icon: LayoutGrid, iconColor: 'text-purple-500' },
   { id: 'rotate', title: 'Ruota Pagine', subtitle: 'Orientamento 90° / 180°', icon: RotateCw, iconColor: 'text-sky-500' },
 ];
@@ -56,6 +60,8 @@ const PDF_ORGANIZE_ITEMS: GroupedItem[] = [
 const PDF_EDIT_SECURITY_ITEMS: GroupedItem[] = [
   { id: 'verify-signature', title: 'Verifica Firme & Integrità', subtitle: 'Audit PAdES e Checksum SHA-256', icon: ShieldCheck, iconColor: 'text-blue-500', badge: 'Audit' },
   { id: 'sign-pdf', title: 'Firma & Timbro Certificato', subtitle: 'Data, ora e hash SHA-256', icon: PenTool, iconColor: 'text-emerald-500', badge: 'Certificato' },
+  { id: 'unlock-pdf', title: 'Sblocca PDF', subtitle: 'Rimuovi password conosciuta', icon: Unlock, iconColor: 'text-amber-500', badge: 'Novità' },
+  { id: 'metadata-pdf', title: 'Ispezione & Metadati', subtitle: 'Proprietà e Privacy Sanitizer', icon: Tag, iconColor: 'text-violet-500', badge: 'Novità' },
   { id: 'redact-pdf', title: 'Oscuramento Permanente', subtitle: 'Cancella dati sensibili e metadati', icon: Eraser, iconColor: 'text-rose-500', badge: 'Sanitizer' },
   { id: 'edit-pdf', title: 'Modifica & Firme PDF', subtitle: 'Testi, timbri e firma a mano', icon: PenTool, iconColor: 'text-rose-600' },
   { id: 'watermark', title: 'Filigrana Diagonale', subtitle: 'Timbro di riservatezza 45°', icon: Stamp, iconColor: 'text-emerald-500' },

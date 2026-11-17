@@ -31,6 +31,7 @@ import { LoadingProvider } from './context/LoadingContext';
 import { ThemePresetProvider } from './context/ThemePresetProvider';
 import { ProgressBarOverlay } from './components/ProgressBarOverlay';
 import { LoadingOverlay } from './components/LoadingOverlay';
+import { GlobalDropzone } from './components/GlobalDropzone';
 
 // Code-split all heavy tools and modals for instant initial page load
 const MergeTool = lazy(() => import('./components/tools/MergeTool').then((m) => ({ default: m.MergeTool })));
@@ -61,6 +62,9 @@ const VaultModal = lazy(() => import('./components/VaultModal').then((m) => ({ d
 const SignPdfTool = lazy(() => import('./components/tools/SignPdfTool').then((m) => ({ default: m.SignPdfTool })));
 const RedactPdfTool = lazy(() => import('./components/tools/RedactPdfTool').then((m) => ({ default: m.RedactPdfTool })));
 const VerifySignatureTool = lazy(() => import('./components/tools/VerifySignatureTool').then((m) => ({ default: m.VerifySignatureTool })));
+const ComparePdfTool = lazy(() => import('./components/tools/ComparePdfTool').then((m) => ({ default: m.ComparePdfTool })));
+const UnlockPdfTool = lazy(() => import('./components/tools/UnlockPdfTool').then((m) => ({ default: m.UnlockPdfTool })));
+const MetadataPdfTool = lazy(() => import('./components/tools/MetadataPdfTool').then((m) => ({ default: m.MetadataPdfTool })));
 const UserManualModal = lazy(() => import('./components/UserManualModal').then((m) => ({ default: m.UserManualModal })));
 
 export default function App() {
@@ -299,6 +303,15 @@ export default function App() {
                 {selectedToolId === 'verify-signature' && (
                   <VerifySignatureTool onSuccess={refreshVaultStats} />
                 )}
+                {selectedToolId === 'compare-pdf' && (
+                  <ComparePdfTool />
+                )}
+                {selectedToolId === 'unlock-pdf' && (
+                  <UnlockPdfTool onSuccess={refreshVaultStats} />
+                )}
+                {selectedToolId === 'metadata-pdf' && (
+                  <MetadataPdfTool />
+                )}
                 {selectedToolId === 'redact-pdf' && (
                   <RedactPdfTool onSuccess={refreshVaultStats} />
                 )}
@@ -316,6 +329,7 @@ export default function App() {
             </div>
           ) : (
             <div className="space-y-8">
+              <GlobalDropzone onSelectTool={handleSelectTool} isActive={selectedToolId === null} />
               <EngineeringHero onSelectTool={handleSelectTool} onOpenPythonStudio={() => setIsPythonStudioOpen(true)} />
               <ToolGrid onSelectTool={handleSelectTool} selectedToolId={selectedToolId} />
             </div>

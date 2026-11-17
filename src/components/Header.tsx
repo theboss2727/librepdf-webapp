@@ -34,6 +34,9 @@ import {
   Eraser,
   ShieldCheck,
   BookOpen,
+  GitCompare,
+  Unlock,
+  Tag,
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useThemePreset } from '../context/ThemePresetProvider';
@@ -145,6 +148,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {[
                     { id: 'merge' as ToolId, label: 'Unisci PDF', icon: Files, color: 'text-rose-500' },
                     { id: 'split' as ToolId, label: 'Dividi & Ritaglia', icon: Scissors, color: 'text-amber-500' },
+                    { id: 'compare-pdf' as ToolId, label: 'Confronta 2 PDF', icon: GitCompare, color: 'text-indigo-500' },
                     { id: 'organize' as ToolId, label: 'Tavolo di Montaggio', icon: LayoutGrid, color: 'text-purple-500' },
                     { id: 'rotate' as ToolId, label: 'Ruota Pagine', icon: RotateCw, color: 'text-sky-500' },
                     { id: 'edit-pdf' as ToolId, label: 'Editor & Firme PDF', icon: PenTool, color: 'text-rose-600' },
@@ -174,6 +178,8 @@ export const Header: React.FC<HeaderProps> = ({
                   {[
                     { id: 'verify-signature' as ToolId, label: 'Verifica Firme & Integrità', icon: ShieldCheck, color: 'text-blue-500' },
                     { id: 'sign-pdf' as ToolId, label: 'Firma & Timbro Certificato', icon: PenTool, color: 'text-emerald-500' },
+                    { id: 'unlock-pdf' as ToolId, label: 'Sblocca PDF (Rimuovi Password)', icon: Unlock, color: 'text-amber-500' },
+                    { id: 'metadata-pdf' as ToolId, label: 'Ispezione & Metadati Privacy', icon: Tag, color: 'text-violet-500' },
                     { id: 'redact-pdf' as ToolId, label: 'Oscuramento Permanente', icon: Eraser, color: 'text-rose-500' },
                     { id: 'compress' as ToolId, label: 'Comprimi PDF', icon: Minimize2, color: 'text-cyan-500' },
                     { id: 'protect' as ToolId, label: 'Proteggi con Password', icon: Lock, color: 'text-red-500' },
