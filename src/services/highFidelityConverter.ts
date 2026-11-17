@@ -143,11 +143,20 @@ export async function convertHighFidelity(
 
   // 3. 100% In-Browser Client-Side Engine (WebAssembly & JS)
   // Zero Install, Zero External Network, Zero API Key required.
-  // Works seamlessly for every visitor on Netlify, mobile, macOS, Linux, and Windows!
+  // Note: Word documents (.docx, .doc, .odt, .rtf) require a real layout engine (Word/LibreOffice or Cloud API)
+  // to prevent degraded or stripped documents. We deliberately do not perform low-fidelity fallback for Word.
+  const lowerName = file.name.toLowerCase();
+  const isWordDoc = targetFormat === 'pdf' && /\.(docx?|doc|odt|rtf)$/i.test(lowerName);
+
+  if (isWordDoc) {
+    throw new Error(
+      'La conversione Word (.docx/.doc) con fedeltà 1:1 richiede un motore di rendering completo (Microsoft Word o LibreOffice). È disponibile gratuitamente tramite LibrePDF Desktop sul tuo computer o inserendo una chiave API Cloud (FreeConvert).'
+    );
+  }
+
   onProgress?.(25, 'Conversione locale nel browser in corso (Zero Server)...');
   const buffer = await file.arrayBuffer();
   let resultData: Uint8Array | Blob;
-  const lowerName = file.name.toLowerCase();
 
   if (targetFormat === 'pdf') {
     if (lowerName.endsWith('.pages')) {
@@ -155,7 +164,7 @@ export async function convertHighFidelity(
     } else if (/\.(xlsx?|xls|csv|numbers|ods)$/.test(lowerName)) {
       resultData = await convertXlsxToPdf(buffer, { orientation: 'landscape' }, onProgress);
     } else {
-      resultData = await convertDocxToPdf(buffer, onProgress);
+      throw new Error('Formato non supportato per la conversione client-side nel browser.');
     }
   } else if (targetFormat === 'docx') {
     resultData = await convertPdfToDocx(buffer, {}, onProgress);

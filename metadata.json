@@ -1,6 +1,0 @@
-{
-  "name": "LibrePDF Studio",
-  "description": "Suite completa di utilità PDF 100% locali, gratuite e open source senza limiti. Elaborazione client-side privata, offline PWA, sincronizzazione cloud opzionale ed esportatore Python PyMuPDF.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

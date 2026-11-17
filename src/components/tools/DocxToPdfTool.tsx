@@ -15,7 +15,11 @@ import {
 import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { getStoredApiKey } from '../../services/freeConvertApi';
-import { convertHighFidelity } from '../../services/highFidelityConverter';
+import {
+  convertHighFidelity,
+  isLocalEngineCapable,
+  type EngineCapabilities,
+} from '../../services/highFidelityConverter';
 import { saveToVault } from '../../services/storageVault';
 import { ConversionEngineBanner } from '../ConversionEngineBanner';
 
@@ -28,6 +32,7 @@ interface DocxToPdfToolProps {
 export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({ onSuccess }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [apiKey, setApiKey] = useState(getStoredApiKey());
+  const [caps, setCaps] = useState<EngineCapabilities | null>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -38,9 +43,17 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({ onSuccess }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fileItem = files[0];
+  const isWordDoc = fileItem ? /\.(docx?|doc|odt|rtf)$/i.test(fileItem.file.name) : true;
+  const isLocalReady = caps ? isLocalEngineCapable(caps, fileItem?.file?.name || 'documento.docx', 'pdf') : false;
+  const hasCloudKey = Boolean(apiKey.trim());
+  const canConvert = !isWordDoc || isLocalReady || hasCloudKey;
 
   const handleConvert = async () => {
     if (!fileItem) return;
+    if (!canConvert) {
+      setErrorMsg('Per convertire Word in PDF con fedeltà 1:1, inserisci una chiave FreeConvert Cloud nel riquadro in alto oppure utilizza la versione LibrePDF Desktop.');
+      return;
+    }
     setErrorMsg(null);
     setIsProcessing(true);
     setProgress(10);
@@ -114,6 +127,7 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({ onSuccess }) => {
       <ConversionEngineBanner
         sourceFormat="docx"
         targetFormat="pdf"
+        onCapabilitiesChange={setCaps}
         onApiKeyChange={setApiKey}
         currentApiKey={apiKey}
       />
@@ -178,6 +192,18 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({ onSuccess }) => {
                 </div>
               )}
 
+              {!canConvert && (
+                <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold">Chiave Cloud o LibrePDF Desktop richiesta per Word</p>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                      Per garantire fedeltà tipografica 1:1 senza produrre PDF degradati o con font deformati, inserisci la tua chiave API FreeConvert (gratuita) nel riquadro in alto, oppure esegui LibrePDF in versione Desktop sul tuo PC.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {isProcessing && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 font-mono">
@@ -195,10 +221,10 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({ onSuccess }) => {
 
               <div className="flex justify-end pt-2">
                 <button
-                  disabled={isProcessing}
+                  disabled={isProcessing || !canConvert}
                   onClick={handleConvert}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer ${
-                    !isProcessing
+                    !isProcessing && canConvert
                       ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-slate-100'
                       : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                   }`}
@@ -210,7 +236,13 @@ export const DocxToPdfTool: React.FC<DocxToPdfToolProps> = ({ onSuccess }) => {
                     </>
                   ) : (
                     <>
-                      <span>Converti in PDF</span>
+                      <span>
+                        {canConvert
+                          ? isLocalReady
+                            ? 'Converti in PDF (Motore Locale 1:1)'
+                            : 'Converti in PDF (Cloud 1:1)'
+                          : 'Richiede Desktop o Chiave Cloud'}
+                      </span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}

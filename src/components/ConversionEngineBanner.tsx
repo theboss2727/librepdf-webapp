@@ -108,6 +108,7 @@ export const ConversionEngineBanner: React.FC<ConversionEngineBannerProps> = ({
 
   const dummyFileName = `documento.${sourceFormat}`;
   const isLocalReady = isLocalEngineCapable(caps, dummyFileName, targetFormat);
+  const isWordToPdf = (sourceFormat.toLowerCase() === 'docx' || sourceFormat.toLowerCase() === 'doc') && targetFormat === 'pdf';
 
   return (
     <div className="space-y-3">
@@ -317,8 +318,189 @@ export const ConversionEngineBanner: React.FC<ConversionEngineBannerProps> = ({
             </div>
           </div>
         </div>
+      ) : isWordToPdf ? (
+        /* Scenario 3-Word: Word to PDF on remote host (e.g. Netlify) requires Desktop or Cloud Key for 1:1 fidelity */
+        apiKeyInput.trim() ? (
+          <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/60 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shrink-0 mt-0.5 sm:mt-0">
+                  <Cloud className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                      Motore Cloud 1:1 Attivo (FreeConvert)
+                    </h4>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
+                      Fedeltà 1:1 Microsoft Office
+                    </span>
+                  </div>
+                  <p className="text-xs text-indigo-900/85 dark:text-indigo-300/80">
+                    La conversione Word in PDF verrà elaborata con fedeltà tipografica 1:1 via FreeConvert Cloud API, preservando font, margini e layout originali.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setShowCloudSettings(!showCloudSettings)}
+                  className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{showCloudSettings ? 'Nascondi chiave' : 'Modifica chiave API'}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCloudSettings ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {showCloudSettings && (
+              <div className="mt-3.5 pt-3.5 border-t border-indigo-200/60 dark:border-indigo-900/40 text-xs space-y-2">
+                <div className="flex items-center gap-2 max-w-md">
+                  <div className="relative flex-1">
+                    <input
+                      type={showKeyPassword ? 'text' : 'password'}
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      placeholder="API Key FreeConvert"
+                      className="w-full text-xs pl-8 pr-8 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono"
+                    />
+                    <Key className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2" />
+                    <button
+                      type="button"
+                      onClick={() => setShowKeyPassword(!showKeyPassword)}
+                      className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-600"
+                    >
+                      {showKeyPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveApiKey}
+                    className="px-3 py-1.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs hover:bg-zinc-800 transition cursor-pointer"
+                  >
+                    Salva
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0 mt-0.5">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-xs font-bold text-amber-950 dark:text-amber-100">
+                    Conversione Word 1:1: Richiede LibrePDF Desktop o Chiave Cloud
+                  </h4>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800">
+                    Fedeltà 1:1 Garantita
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900/90 dark:text-amber-200/80 leading-relaxed">
+                  I documenti Word (.docx, .doc) contengono impaginazioni complesse e font Microsoft. Per non produrre file PDF deformati o sgranati, LibrePDF non effettua conversioni approssimate nel browser, ma richiede un motore di rendering completo:
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              {/* Option 1: Desktop */}
+              <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-200/70 dark:border-amber-900/60 flex flex-col justify-between space-y-2">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+                    Opzione 1 (100% Locale & Gratuita)
+                  </span>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 block mt-0.5">
+                    LibrePDF Desktop per il tuo PC
+                  </span>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                    Esegui la versione Desktop di LibrePDF sul tuo computer per convertire file Word sfruttando direttamente il motore locale (Microsoft Word o LibreOffice), 100% offline e senza limiti.
+                  </p>
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  <a
+                    href="https://github.com/theboss2727/librepdf-webapp"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold transition cursor-pointer"
+                  >
+                    <span>Vedi LibrePDF Desktop su GitHub</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => loadCapabilities(true)}
+                    className="w-full flex items-center justify-center gap-1.5 py-1 px-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-[10px] transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-2.5 h-2.5" />
+                    <span>Verifica se è già in esecuzione sul PC</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Option 2: Cloud API Key */}
+              <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-200/70 dark:border-amber-900/60 flex flex-col justify-between space-y-2">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
+                    Opzione 2 (Consigliata per il Web)
+                  </span>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 block mt-0.5">
+                    Converti subito online con Chiave Cloud
+                  </span>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                    Incolla la tua chiave API gratuita di FreeConvert per sbloccare all'istante la conversione 1:1 direttamente dal browser, senza installare nulla.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <input
+                        type={showKeyPassword ? 'text' : 'password'}
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder="Incolla API Key FreeConvert"
+                        className="w-full text-xs pl-8 pr-8 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono"
+                      />
+                      <Key className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2" />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyPassword(!showKeyPassword)}
+                        className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-600"
+                      >
+                        {showKeyPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSaveApiKey}
+                      className="px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition cursor-pointer"
+                    >
+                      {isKeySaved ? <Check className="w-3.5 h-3.5" /> : 'Salva'}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                    <span>Serve una chiave?</span>
+                    <a
+                      href="https://www.freeconvert.com/api"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-500 hover:underline flex items-center gap-0.5"
+                    >
+                      <span>Crea account gratuito (750 min/mese)</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       ) : (
-        /* Scenario 3: Remote hosting (e.g. Netlify) or No local backend found */
+        /* Scenario 3: Remote hosting (e.g. Netlify) for WebAssembly-capable tools (Excel to PDF, PDF to Word/Excel, etc.) */
         <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
