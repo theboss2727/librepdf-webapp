@@ -49,6 +49,7 @@ LibrePDF Studio è una workstation documentale progettata per offrire la potenza
 - **PDF in Excel (.xlsx):** Estrazione precisa di tabelle matriciali e celle.
 - **PDF in Immagini (JPG / PNG):** Rasterizzazione ad alta densità (72 / 144 / 216 DPI) con download singolo o ZIP.
 - **Immagini in PDF:** Compositing di foto JPG, PNG e WebP in layout vettoriale.
+- **Markdown (.md) in PDF:** Conversione tipografica vettoriale ad alta fedeltà con tabelle, codice, impaginazione e numerazione pagine.
 - **PDF in Markdown / HTML:** Transcodifica semantica per Notion, Obsidian e documentazione tecnica.
 - **OCR Tesseract Wasm:** Riconoscimento ottico dei caratteri offline da scansioni cartacee e foto.
 - **Scala di Grigi:** Desaturazione canali colore ITU-R BT.601 per stampa economica.

@@ -905,6 +905,19 @@ for i in range(handler.get_page_count()):
 with open("documento.md", "w", encoding="utf-8") as f:
     f.write("\\n\\n".join(md_content))`;
 
+    case 'markdown-to-pdf':
+      return `# Conversione Markdown in PDF con formattazione e tabelle
+# Nota: L'app web LibrePDF esegue la conversione direttamente nel browser via Wasm!
+import markdown
+import weasyprint # oppure xhtml2pdf
+
+with open("documento.md", "r", encoding="utf-8") as f:
+    text = f.read()
+
+html = markdown.markdown(text, extensions=['tables', 'fenced_code'])
+weasyprint.HTML(string=html).write_pdf("documento.pdf")
+print("PDF da Markdown generato con successo!")`;
+
     case 'extract-text':
       return `# Estrazione testo con PyMuPDF
 from pdf_handler import PDFHandler

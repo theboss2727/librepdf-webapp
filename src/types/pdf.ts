@@ -13,6 +13,7 @@ export type ToolId =
   | 'pdf-to-xlsx'
   | 'xlsx-to-pdf'
   | 'pdf-to-markdown'
+  | 'markdown-to-pdf'
   | 'pdf-to-images'
   | 'images-to-pdf'
   | 'grayscale'

@@ -188,6 +188,7 @@ export const Header: React.FC<HeaderProps> = ({
                     { id: 'images-to-pdf' as ToolId, label: 'Immagini in PDF', icon: Images, color: 'text-pink-500' },
                     { id: 'extract-text' as ToolId, label: 'Estrai Testo Vettoriale', icon: FileText, color: 'text-teal-500' },
                     { id: 'pdf-to-markdown' as ToolId, label: 'PDF in Markdown / HTML', icon: FileCode2, color: 'text-violet-500' },
+                    { id: 'markdown-to-pdf' as ToolId, label: 'Markdown (.md) in PDF', icon: FileCode2, color: 'text-purple-500' },
                     { id: 'grayscale' as ToolId, label: 'Scala di Grigi', icon: SunMedium, color: 'text-slate-500' },
                     { id: 'repair' as ToolId, label: 'Ripara Struttura XRef', icon: Wrench, color: 'text-emerald-500' },
                   ].map((item) => (

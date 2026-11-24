@@ -43,6 +43,7 @@ const OrganizeTool = lazy(() => import('./components/tools/OrganizeTool').then((
 const ExtractTextTool = lazy(() => import('./components/tools/ExtractTextTool').then((m) => ({ default: m.ExtractTextTool })));
 const OcrTool = lazy(() => import('./components/tools/OcrTool').then((m) => ({ default: m.OcrTool })));
 const PdfToMarkdownTool = lazy(() => import('./components/tools/PdfToMarkdownTool').then((m) => ({ default: m.PdfToMarkdownTool })));
+const MarkdownToPdfTool = lazy(() => import('./components/tools/MarkdownToPdfTool').then((m) => ({ default: m.MarkdownToPdfTool })));
 const PdfToImagesTool = lazy(() => import('./components/tools/PdfToImagesTool').then((m) => ({ default: m.PdfToImagesTool })));
 const ImagesToPdfTool = lazy(() => import('./components/tools/ImagesToPdfTool').then((m) => ({ default: m.ImagesToPdfTool })));
 const CompressTool = lazy(() => import('./components/tools/CompressTool').then((m) => ({ default: m.CompressTool })));
@@ -209,6 +210,7 @@ export default function App() {
                   <option value="images-to-pdf">Immagini in PDF</option>
                   <option value="extract-text">Estrai Testo Vettoriale</option>
                   <option value="pdf-to-markdown">PDF in Markdown / HTML</option>
+                  <option value="markdown-to-pdf">Markdown (.md) in PDF</option>
                   <option value="grayscale">Scala di Grigi</option>
                   <option value="repair">Ripara Struttura XRef</option>
                 </optgroup>
@@ -269,6 +271,9 @@ export default function App() {
                 )}
                 {selectedToolId === 'pdf-to-markdown' && (
                   <PdfToMarkdownTool onSuccess={refreshVaultStats} />
+                )}
+                {selectedToolId === 'markdown-to-pdf' && (
+                  <MarkdownToPdfTool onSuccess={refreshVaultStats} />
                 )}
                 {selectedToolId === 'pdf-to-docx' && (
                   <PdfToDocxTool onSuccess={refreshVaultStats} />

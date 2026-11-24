@@ -89,6 +89,10 @@ export const GlobalDropzone: React.FC<GlobalDropzoneProps> = ({ onSelectTool, is
         onSelectTool('docx-to-pdf');
         return;
       }
+      if (/\.(md|markdown)$/.test(name)) {
+        onSelectTool('markdown-to-pdf');
+        return;
+      }
       if (/\.(xlsx?|xls|csv|numbers|ods)$/.test(name)) {
         onSelectTool('xlsx-to-pdf');
         return;

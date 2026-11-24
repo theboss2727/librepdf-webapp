@@ -77,6 +77,7 @@ const PDF_EXTRACT_MEDIA_ITEMS: GroupedItem[] = [
   { id: 'images-to-pdf', title: 'Immagini in PDF', subtitle: 'Unisci foto JPG/PNG in PDF', icon: Images, iconColor: 'text-pink-500' },
   { id: 'extract-text', title: 'Estrai Testo Puro', subtitle: 'Testo vettoriale e metadati', icon: FileText, iconColor: 'text-teal-500' },
   { id: 'pdf-to-markdown', title: 'PDF in Markdown / HTML', subtitle: 'Esporta per editor e web', icon: FileCode2, iconColor: 'text-violet-500' },
+  { id: 'markdown-to-pdf', title: 'Markdown (.md) in PDF', subtitle: 'Layout vettoriale 1:1', icon: FileCode2, iconColor: 'text-purple-500', badge: 'Novità' },
   { id: 'grayscale', title: 'Scala di Grigi', subtitle: 'Conversione stampa B/N', icon: SunMedium, iconColor: 'text-slate-500' },
   { id: 'repair', title: 'Ripara Struttura XRef', subtitle: 'Recupera PDF danneggiati', icon: Wrench, iconColor: 'text-emerald-600' },
 ];
