@@ -6,6 +6,7 @@ import {
   Cpu,
   Lock,
   BookOpen,
+  GitCommit,
 } from 'lucide-react';
 
 interface FooterProps {
@@ -75,6 +76,17 @@ export const Footer: React.FC<FooterProps> = ({
             <span>WASM 64-bit Core</span>
             <span>·</span>
             <span>PyMuPDF Native Ingestion</span>
+            <span>·</span>
+            <a
+              href={`https://github.com/theboss2727/librepdf-webapp/commit/${__APP_COMMIT_HASH__}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-mono transition-colors shadow-2xs"
+              title={`Commit ${__APP_COMMIT_HASH__} (Compilato il ${__APP_BUILD_TIME__})`}
+            >
+              <GitCommit className="w-3 h-3 text-rose-500" />
+              <span>rev:{__APP_COMMIT_HASH__}</span>
+            </a>
           </div>
         </div>
       </div>

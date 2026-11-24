@@ -162,9 +162,21 @@ export default function App() {
                   </span>
                 </>
               ) : (
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Pannello Principale · Seleziona un gruppo qui sotto o dal menu a tendina →
-                </span>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Pannello Principale · Seleziona un gruppo qui sotto o dal menu a tendina →
+                  </span>
+                  <a
+                    href={`https://github.com/theboss2727/librepdf-webapp/commit/${__APP_COMMIT_HASH__}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-[10px] font-mono text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors shadow-2xs cursor-pointer"
+                    title={`Codice Commit: ${__APP_COMMIT_HASH__} (Compilato il ${__APP_BUILD_TIME__})`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>rev:{__APP_COMMIT_HASH__}</span>
+                  </a>
+                </div>
               )}
             </div>
 

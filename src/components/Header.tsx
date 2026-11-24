@@ -120,6 +120,18 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Dev Commit Indicator Badge */}
+          <a
+            href={`https://github.com/theboss2727/librepdf-webapp/commit/${__APP_COMMIT_HASH__}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-200/90 dark:border-slate-700/80 text-[10px] font-mono text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors shadow-2xs"
+            title={`Codice Commit: ${__APP_COMMIT_HASH__} (Compilato il ${__APP_BUILD_TIME__}) - Clicca per visualizzare su GitHub`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>rev:{__APP_COMMIT_HASH__}</span>
+          </a>
         </div>
 
         {/* Zone 2: Visible Interactive Dropdown Menus */}
