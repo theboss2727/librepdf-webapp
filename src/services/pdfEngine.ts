@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, degrees, StandardFonts, PDFName, PDFArray, PDFString } from 'pdf-lib';
 import { pdfjsLib } from './pdfjsSetup';
 import type { WatermarkOptions, PageNumberOptions, PdfEditElement } from '../types/pdf';
+import { stripBase64Header, getBaseFileName } from '../utils/stringUtils';
 
 /** Helper to convert hex color to RGB 0-1 */
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -64,7 +65,7 @@ export async function splitPdf(
   const buffer = await file.arrayBuffer();
   const sourcePdf = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const totalPages = sourcePdf.getPageCount();
-  const baseName = file.name.replace(/\.pdf$/i, '');
+  const baseName = getBaseFileName(file.name);
   const results: { name: string; data: Uint8Array; pageCount: number }[] = [];
 
   if (mode === 'all-pages') {
@@ -932,7 +933,7 @@ async function createImmutableStampPngBytes(
     }
 
     const dataUrl = canvas.toDataURL('image/png');
-    const cleanData = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const cleanData = stripBase64Header(dataUrl);
     const binary = atob(cleanData);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -1061,7 +1062,7 @@ export async function signPdf(
 
     if (options.signatureImageBase64) {
       try {
-        const cleanData = options.signatureImageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const cleanData = stripBase64Header(options.signatureImageBase64);
         const binary = atob(cleanData);
         const imgBytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) imgBytes[i] = binary.charCodeAt(i);

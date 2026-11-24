@@ -4,6 +4,7 @@ import { FileDropzone, type FileItem } from '../FileDropzone';
 import { extractTextFromPdf } from '../../services/pdfEngine';
 import { useToolRunner } from '../../hooks/useToolRunner';
 import { PreviewToggle } from '../PreviewToggle';
+import { getBaseFileName, escapeHtml } from '../../utils/stringUtils';
 
 interface PdfToMarkdownToolProps {
   onSuccess: () => void;
@@ -29,7 +30,7 @@ export const PdfToMarkdownTool: React.FC<PdfToMarkdownToolProps> = ({ onSuccess 
     await run(
       async () => {
         const data = await extractTextFromPdf(fileItem.file);
-        const title = fileItem.file.name.replace(/\.[^/.]+$/, '');
+        const title = getBaseFileName(fileItem.file.name);
 
         // Generate clean Markdown representation
         let mdString = `# ${title}\n\n`;
@@ -56,7 +57,7 @@ export const PdfToMarkdownTool: React.FC<PdfToMarkdownToolProps> = ({ onSuccess 
           .map(
             (p) => `  <section class="pdf-page" data-page="${p.pageNumber}">
     <h2>Pagina ${p.pageNumber}</h2>
-    <p>${p.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    <p>${escapeHtml(p.text)}</p>
   </section>`
           )
           .join('\n\n');
@@ -113,7 +114,7 @@ ${htmlBody}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${fileItem.file.name.replace(/\.[^/.]+$/, '')}${ext}`;
+    a.download = `${getBaseFileName(fileItem.file.name)}${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   };

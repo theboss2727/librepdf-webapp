@@ -20,6 +20,7 @@ import confetti from 'canvas-confetti';
 import { FileDropzone, type FileItem } from '../FileDropzone';
 import { convertMarkdownToPdf, type MarkdownPdfOptions } from '../../services/markdownToPdf';
 import { saveToVault } from '../../services/storageVault';
+import { getBaseFileName } from '../../utils/stringUtils';
 
 const SAMPLE_MARKDOWN = `# Documento Tecnico & Relazione di Progetto
 *Autore: Team di Sviluppo LibrePDF | Data: Novembre 2026*
@@ -122,7 +123,7 @@ export const MarkdownToPdfTool: React.FC<MarkdownToPdfToolProps> = ({ onSuccess 
         const text = e.target?.result as string;
         if (text) {
           setMarkdownText(text);
-          const baseName = file.name.replace(/\.[^/.]+$/, '');
+          const baseName = getBaseFileName(file.name);
           setCustomTitle(baseName);
         }
       };

@@ -17,6 +17,7 @@ import { redactPdf, renderPageToImage, type RedactionArea } from '../../services
 import { useToolRunner } from '../../hooks/useToolRunner';
 import { PreviewToggle } from '../PreviewToggle';
 import { PdfPreviewButton } from '../PdfPreviewButton';
+import { getBaseFileName } from '../../utils/stringUtils';
 
 interface RedactPdfToolProps {
   onSuccess: () => void;
@@ -164,7 +165,7 @@ export const RedactPdfTool: React.FC<RedactPdfToolProps> = ({ onSuccess }) => {
         setResultBlob(blob);
         setResultBytes(blob.size);
 
-        const baseName = fileItem.file.name.replace(/\.pdf$/i, '');
+        const baseName = getBaseFileName(fileItem.file.name);
         const outName = `${baseName}_oscurato.pdf`;
 
         await persist({
@@ -189,7 +190,7 @@ export const RedactPdfTool: React.FC<RedactPdfToolProps> = ({ onSuccess }) => {
   };
 
   const outFileName = fileItem
-    ? `${fileItem.file.name.replace(/\.pdf$/i, '')}_oscurato.pdf`
+    ? `${getBaseFileName(fileItem.file.name)}_oscurato.pdf`
     : 'documento_oscurato.pdf';
 
   const currentPageRedactions = redactions.filter((r) => r.pageNumber === currentPage);
