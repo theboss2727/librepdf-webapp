@@ -470,6 +470,91 @@ export async function convertMarkdownToPdf(
   };
 
   /**
+   * Break a word into sub-pieces along punctuation break points
+   * (/, -, _, ., @, :, ?, &, =) or character-by-character if still exceeding maxWidth.
+   * This guarantees no piece or word is ever wider than maxWidth.
+   */
+  const splitWordToFitWidth = (
+    word: string,
+    font: PDFFont,
+    fontSize: number,
+    maxWidth: number
+  ): { text: string; width: number }[] => {
+    if (!word) return [];
+
+    let totalW = 0;
+    try {
+      totalW = font.widthOfTextAtSize(word, fontSize);
+    } catch {
+      totalW = maxWidth + 1;
+    }
+
+    if (totalW <= maxWidth) {
+      return [{ text: word, width: totalW }];
+    }
+
+    // Split on breakable characters (/ - _ . @ : ? & = # \)
+    const subWords: string[] = [];
+    let buffer = '';
+
+    for (let i = 0; i < word.length; i++) {
+      const char = word[i];
+      buffer += char;
+      if ('/-_.:@?&=#\\'.includes(char) && i < word.length - 1) {
+        subWords.push(buffer);
+        buffer = '';
+      }
+    }
+    if (buffer) {
+      subWords.push(buffer);
+    }
+
+    const result: { text: string; width: number }[] = [];
+
+    for (const part of subWords) {
+      let pWidth = 0;
+      try {
+        pWidth = font.widthOfTextAtSize(part, fontSize);
+      } catch {
+        pWidth = maxWidth + 1;
+      }
+
+      if (pWidth <= maxWidth) {
+        result.push({ text: part, width: pWidth });
+      } else {
+        // Force character-by-character break
+        let cur = '';
+        let curW = 0;
+
+        for (let j = 0; j < part.length; j++) {
+          const c = part[j];
+          let cW = 0;
+          try {
+            cW = font.widthOfTextAtSize(c, fontSize);
+          } catch {
+            cW = fontSize * 0.6;
+          }
+
+          if (curW + cW > maxWidth && cur.length > 0) {
+            result.push({ text: cur, width: curW });
+            cur = c;
+            curW = cW;
+          } else {
+            cur += c;
+            curW += cW;
+          }
+        }
+
+        if (cur) {
+          result.push({ text: cur, width: curW });
+        }
+      }
+    }
+
+    return result;
+  };
+
+  /**
    * Word wrap inline spans into lines of styled fragments
    */
   interface TextFragment {
@@ -500,13 +585,21 @@ export async function convertMarkdownToPdf(
       const words = sanitized.split(/(\s+)/);
       words.forEach((w) => {
         if (!w) return;
-        let wWidth = 0;
-        try {
-          wWidth = font.widthOfTextAtSize(w, fontSize);
-        } catch {
-          wWidth = 0;
+        if (/^\s+$/.test(w)) {
+          let wWidth = 0;
+          try {
+            wWidth = font.widthOfTextAtSize(w, fontSize);
+          } catch {
+            wWidth = fontSize * 0.3;
+          }
+          wordsWithStyle.push({ word: w, span, font, width: wWidth });
+        } else {
+          // Break word if it exceeds maxWidth or has soft-break points
+          const pieces = splitWordToFitWidth(w, font, fontSize, maxWidth);
+          pieces.forEach((piece) => {
+            wordsWithStyle.push({ word: piece.text, span, font, width: piece.width });
+          });
         }
-        wordsWithStyle.push({ word: w, span, font, width: wWidth });
       });
     });
 
@@ -612,6 +705,78 @@ export async function convertMarkdownToPdf(
     });
   };
 
+  /**
+   * Calculate proportional column widths based on cell content length
+   */
+  const calculateTableColumnWidths = (
+    headers: InlineSpan[][],
+    rows: InlineSpan[][][],
+    availWidth: number
+  ): number[] => {
+    const colCount = Math.max(headers.length, ...rows.map((r) => r.length));
+    if (colCount <= 0) return [];
+    if (colCount === 1) return [availWidth];
+
+    const colMaxChars = new Array(colCount).fill(0);
+    const colTotalChars = new Array(colCount).fill(0);
+
+    const getSpansLen = (spans?: InlineSpan[]) =>
+      (spans || []).reduce((sum, s) => sum + s.text.length, 0);
+
+    headers.forEach((h, c) => {
+      const len = getSpansLen(h);
+      colMaxChars[c] = Math.max(colMaxChars[c], len);
+      colTotalChars[c] += len;
+    });
+
+    rows.forEach((row) => {
+      row.forEach((cell, c) => {
+        if (c < colCount) {
+          const len = getSpansLen(cell);
+          colMaxChars[c] = Math.max(colMaxChars[c], len);
+          colTotalChars[c] += len;
+        }
+      });
+    });
+
+    // Proportional weights: very short columns (1-3 chars) stay compact, longer columns get more room
+    const minColWidth = 38;
+    const colWeights = colMaxChars.map((maxLen, c) => {
+      const avgLen = rows.length > 0 ? colTotalChars[c] / (rows.length + 1) : maxLen;
+      if (maxLen <= 2) return 1.0;
+      if (maxLen <= 6) return 1.8;
+      if (maxLen <= 14) return 3.2;
+      if (maxLen <= 25) return 5.0;
+      return Math.min(16, 5.0 + Math.sqrt(avgLen) * 2.0);
+    });
+
+    const totalWeight = colWeights.reduce((a, b) => a + b, 0);
+    let widths = colWeights.map((w) =>
+      Math.max(minColWidth, Math.floor((w / totalWeight) * availWidth))
+    );
+
+    let sum = widths.reduce((a, b) => a + b, 0);
+    while (sum > availWidth) {
+      let maxIdx = 0;
+      for (let i = 1; i < colCount; i++) {
+        if (widths[i] > widths[maxIdx]) maxIdx = i;
+      }
+      widths[maxIdx]--;
+      sum--;
+    }
+
+    const remainder = availWidth - sum;
+    if (remainder > 0) {
+      let maxIdx = 0;
+      for (let i = 1; i < colCount; i++) {
+        if (widths[i] > widths[maxIdx]) maxIdx = i;
+      }
+      widths[maxIdx] += remainder;
+    }
+
+    return widths;
+  };
+
   onProgress?.(40, 'Composizione layout vettoriale delle sezioni...');
   const totalBlocks = parsed.blocks.length;
 
@@ -624,16 +789,16 @@ export async function convertMarkdownToPdf(
       case 'header': {
         const sizes = [22, 17, 14, 12, 11, 10];
         const hSize = sizes[block.level - 1] || 12;
-        const topSpacing = block.level <= 2 ? 18 : 12;
-        const bottomSpacing = block.level <= 2 ? 8 : 4;
+        const topSpacing = block.level === 1 ? 26 : block.level === 2 ? 22 : 16;
+        const bottomSpacing = block.level <= 2 ? 14 : 8;
 
-        ensureSpace(hSize + topSpacing + bottomSpacing + 15);
+        ensureSpace(hSize + topSpacing + bottomSpacing + 25);
         currentY -= topSpacing;
 
         const lines = wrapSpansToLines(block.spans, hSize, availableWidth, headerColor);
         drawLines(lines, margin);
 
-        // Underline for H1 and H2
+        // Underline for H1 and H2 with comfortable padding
         if (block.level <= 2) {
           currentY -= 4;
           currentPage.drawLine({
@@ -652,7 +817,7 @@ export async function convertMarkdownToPdf(
       case 'paragraph': {
         const lines = wrapSpansToLines(block.spans, 10.5, availableWidth, textColor);
         drawLines(lines, margin);
-        currentY -= 6; // paragraph spacing
+        currentY -= 8; // paragraph spacing
         break;
       }
 
@@ -842,102 +1007,150 @@ export async function convertMarkdownToPdf(
         const colCount = Math.max(block.headers.length, ...block.rows.map((r) => r.length));
         if (colCount === 0) break;
 
-        const colWidth = availableWidth / colCount;
+        ensureSpace(50);
+        currentY -= 12; // Breathing room before table
+
+        const colWidths = calculateTableColumnWidths(block.headers, block.rows, availableWidth);
         const cellPadding = 6;
         const cellFontSize = 9;
 
-        // Render header row
-        ensureSpace(35);
+        // Calculate multi-line header height
+        const headerLinesPerCol = block.headers.map((hCell, cIdx) => {
+          const colW = colWidths[cIdx] || (availableWidth / colCount);
+          return wrapSpansToLines(hCell, cellFontSize, colW - cellPadding * 2, headerColor);
+        });
+        const maxHeaderLines = Math.max(1, ...headerLinesPerCol.map((l) => l.length));
+        const headerHeight = maxHeaderLines * cellFontSize * 1.35 + cellPadding * 2;
+
+        ensureSpace(headerHeight + 30);
+
+        // Render header row background and outer border
         currentPage.drawRectangle({
           x: margin,
-          y: currentY - 22,
+          y: currentY - headerHeight,
           width: availableWidth,
-          height: 22,
+          height: headerHeight,
           color: tableHeaderBg,
           borderColor: subtleBorderColor,
           borderWidth: 0.75,
         });
 
-        block.headers.forEach((hCell, cIdx) => {
-          const cX = margin + cIdx * colWidth + cellPadding;
-          const lines = wrapSpansToLines(hCell, cellFontSize, colWidth - cellPadding * 2, headerColor);
-          if (lines[0] && lines[0].fragments[0]) {
-            currentPage.drawText(lines[0].fragments.map((f) => f.text).join(''), {
-              x: cX,
-              y: currentY - 14,
-              size: cellFontSize,
-              font: fontBold,
-              color: headerColor,
+        // Inner vertical lines in header
+        let hLineX = margin;
+        for (let c = 0; c < colCount - 1; c++) {
+          hLineX += colWidths[c];
+          currentPage.drawLine({
+            start: { x: hLineX, y: currentY },
+            end: { x: hLineX, y: currentY - headerHeight },
+            thickness: 0.5,
+            color: subtleBorderColor,
+          });
+        }
+
+        // Draw header text fragments
+        let colHeadX = margin;
+        block.headers.forEach((_, cIdx) => {
+          const colW = colWidths[cIdx] || (availableWidth / colCount);
+          const lines = headerLinesPerCol[cIdx] || [];
+          let cellY = currentY - cellPadding - cellFontSize;
+
+          lines.forEach((l) => {
+            let curFragX = colHeadX + cellPadding;
+            l.fragments.forEach((frag) => {
+              currentPage.drawText(frag.text, {
+                x: curFragX,
+                y: cellY,
+                size: cellFontSize,
+                font: fontBold,
+                color: headerColor,
+              });
+              curFragX += frag.width;
             });
-          }
+            cellY -= cellFontSize * 1.35;
+          });
+
+          colHeadX += colW;
         });
-        currentY -= 22;
+
+        currentY -= headerHeight;
 
         // Render table rows
         block.rows.forEach((row, rIdx) => {
-          const rowLinesPerCol = row.map((cell) => wrapSpansToLines(cell, cellFontSize, colWidth - cellPadding * 2, textColor));
+          const rowLinesPerCol = row.map((cell, cIdx) => {
+            const colW = colWidths[cIdx] || (availableWidth / colCount);
+            return wrapSpansToLines(cell, cellFontSize, colW - cellPadding * 2, textColor);
+          });
           const maxLines = Math.max(1, ...rowLinesPerCol.map((l) => l.length));
           const rowHeight = maxLines * cellFontSize * 1.35 + cellPadding * 2;
 
-          ensureSpace(rowHeight + 4);
+          ensureSpace(rowHeight + 6);
 
-          // Alternating row background
-          if (rIdx % 2 === 1) {
-            currentPage.drawRectangle({
-              x: margin,
-              y: currentY - rowHeight,
-              width: availableWidth,
-              height: rowHeight,
-              color: rgb(0.985, 0.99, 1),
-            });
-          }
-
-          // Row borders
+          // Alternating row background and outer border
           currentPage.drawRectangle({
             x: margin,
             y: currentY - rowHeight,
             width: availableWidth,
             height: rowHeight,
+            color: rIdx % 2 === 1 ? rgb(0.985, 0.99, 1) : rgb(1, 1, 1),
             borderColor: subtleBorderColor,
             borderWidth: 0.5,
           });
 
-          // Draw cells
+          // Inner vertical divider lines for this row
+          let vLineX = margin;
+          for (let c = 0; c < colCount - 1; c++) {
+            vLineX += colWidths[c];
+            currentPage.drawLine({
+              start: { x: vLineX, y: currentY },
+              end: { x: vLineX, y: currentY - rowHeight },
+              thickness: 0.5,
+              color: subtleBorderColor,
+            });
+          }
+
+          // Draw cells with exact fragment fonts & colors
+          let rowCellX = margin;
           row.forEach((_, cIdx) => {
+            const colW = colWidths[cIdx] || (availableWidth / colCount);
             const colLines = rowLinesPerCol[cIdx] || [];
-            const cX = margin + cIdx * colWidth + cellPadding;
             let cellY = currentY - cellPadding - cellFontSize;
 
             colLines.forEach((l) => {
-              const fullText = l.fragments.map((f) => f.text).join('');
-              currentPage.drawText(fullText, {
-                x: cX,
-                y: cellY,
-                size: cellFontSize,
-                font: fontRegular,
-                color: textColor,
+              let curFragX = rowCellX + cellPadding;
+              l.fragments.forEach((frag) => {
+                currentPage.drawText(frag.text, {
+                  x: curFragX,
+                  y: cellY,
+                  size: cellFontSize,
+                  font: frag.font,
+                  color: frag.color,
+                });
+                curFragX += frag.width;
               });
               cellY -= cellFontSize * 1.35;
             });
+
+            rowCellX += colW;
           });
 
           currentY -= rowHeight;
         });
 
-        currentY -= 8;
+        // Generous spacing after table before next element
+        currentY -= 18;
         break;
       }
 
       case 'hr': {
-        ensureSpace(16);
-        currentY -= 8;
+        ensureSpace(32);
+        currentY -= 14;
         currentPage.drawLine({
           start: { x: margin, y: currentY },
           end: { x: margin + availableWidth, y: currentY },
           thickness: 0.75,
           color: subtleBorderColor,
         });
-        currentY -= 8;
+        currentY -= 16;
         break;
       }
 
