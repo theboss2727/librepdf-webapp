@@ -1,4 +1,13 @@
-import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib';
+import {
+  PDFDocument,
+  rgb,
+  StandardFonts,
+  PDFPage,
+  PDFFont,
+  PDFName,
+  PDFArray,
+  PDFString,
+} from 'pdf-lib';
 
 export interface MarkdownPdfOptions {
   theme?: 'github' | 'academic' | 'modern' | 'mono';
@@ -77,58 +86,130 @@ function sanitizeForPdfFont(text: string, font: PDFFont): string {
 }
 
 /**
- * Parse inline Markdown formatting: **bold**, *italic*, `code`, ~~strike~~, [text](url)
+ * Attach a clickable URI Link annotation to the PDF page at specified bounding box
+ */
+function addLinkAnnotationToPage(
+  pdfDoc: PDFDocument,
+  page: PDFPage,
+  rect: [number, number, number, number],
+  uri: string
+) {
+  try {
+    let cleanUri = uri.trim();
+    if (
+      !cleanUri.startsWith('http://') &&
+      !cleanUri.startsWith('https://') &&
+      !cleanUri.startsWith('mailto:') &&
+      !cleanUri.startsWith('tel:') &&
+      !cleanUri.startsWith('#')
+    ) {
+      cleanUri = `https://${cleanUri}`;
+    }
+
+    const annot = pdfDoc.context.obj({
+      Type: 'Annot',
+      Subtype: 'Link',
+      Rect: rect,
+      Border: [0, 0, 0], // completely borderless
+      F: 4, // Print flag
+      A: {
+        Type: 'Action',
+        S: 'URI',
+        URI: PDFString.of(cleanUri),
+      },
+    });
+
+    const annotRef = pdfDoc.context.register(annot);
+    const existingAnnots = page.node.lookupMaybe(PDFName.of('Annots'), PDFArray);
+    if (existingAnnots) {
+      existingAnnots.push(annotRef);
+    } else {
+      page.node.set(PDFName.of('Annots'), pdfDoc.context.obj([annotRef]));
+    }
+  } catch (err) {
+    console.warn('Errore aggiunta link annotation nel PDF:', err);
+  }
+}
+
+/**
+ * Parse inline Markdown formatting: **bold**, *italic*, `code`, ~~strike~~, [text](url), <url>, <a href="...">
  */
 function parseInlineMarkdown(text: string): InlineSpan[] {
   if (!text) return [];
 
+  // 1. Replace escaped underscores (\_) and escaped asterisks (\*) with temporary private-use unicode characters
+  const ESCAPED_UNDERSCORE = '\uE000';
+  const ESCAPED_ASTERISK = '\uE001';
+  const processed = text
+    .replace(/\\_/g, ESCAPED_UNDERSCORE)
+    .replace(/\\\*/g, ESCAPED_ASTERISK);
+
   const spans: InlineSpan[] = [];
-  // Regex to match inline tokens
+  // GFM emphasis rules:
+  // - Asterisks can format intra-word emphasis: *italic*, **bold**
+  // - Underscores can ONLY trigger emphasis at word boundaries (not within words / snake_case):
+  //   Opening _ or __ must not be preceded by an alphanumeric character (a-zA-Z0-9)
+  //   Closing _ or __ must not be followed by an alphanumeric character (a-zA-Z0-9)
   // 1: `code`
-  // 2: ***bold italic***
-  // 3: **bold** or __bold__
-  // 4: *italic* or _italic_
-  // 5: ~~strike~~
-  // 6: [link text](url)
-  const regex = /(`([^`]+)`)|\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|__([^_]+)__|(?<!\*)\*([^*]+)\*(?!\*)|(?<!_)_([^_]+)_(?!_)|~~([^~]+)~~|\[([^\]]+)\]\(([^)]+)\)/g;
+  // 3: ***bold italic***
+  // 4, 5: **bold** or __bold__
+  // 6, 7: *italic* or _italic_
+  // 8: ~~strike~~
+  // 9, 10: [link text](url)
+  // 11, 12: <a href="url">text</a>
+  // 13: <autolink>
+  // 14: bare url
+  const regex = /(`([^`]+)`)|\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|(?<![a-zA-Z0-9])__([^_]+)__(?![a-zA-Z0-9])|(?<!\*)\*([^*]+)\*(?!\*)|(?<![a-zA-Z0-9])_([^_]+)_(?![a-zA-Z0-9])|~~([^~]+)~~|\[([^\]]+)\]\(([^)]+)\)|<a\s+[^>]*?href=["']([^"']+)["'][^>]*>(.*?)<\/a>|<((?:https?:\/\/|mailto:)[^>]+)>|(?<!\(|\/)(https?:\/\/[^\s<>)"]+)/gi;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(text)) !== null) {
+  const restoreEscapes = (str: string) =>
+    str.replace(/\uE000/g, '_').replace(/\uE001/g, '*');
+
+  while ((match = regex.exec(processed)) !== null) {
     const matchIndex = match.index;
     if (matchIndex > lastIndex) {
-      spans.push({ text: text.substring(lastIndex, matchIndex) });
+      spans.push({ text: restoreEscapes(processed.substring(lastIndex, matchIndex)) });
     }
 
     if (match[2] !== undefined) {
       // inline code
-      spans.push({ text: match[2], code: true });
+      spans.push({ text: restoreEscapes(match[2]), code: true });
     } else if (match[3] !== undefined) {
       // bold italic
-      spans.push({ text: match[3], bold: true, italic: true });
+      spans.push({ text: restoreEscapes(match[3]), bold: true, italic: true });
     } else if (match[4] !== undefined || match[5] !== undefined) {
       // bold
-      spans.push({ text: match[4] || match[5], bold: true });
+      spans.push({ text: restoreEscapes(match[4] || match[5]), bold: true });
     } else if (match[6] !== undefined || match[7] !== undefined) {
       // italic
-      spans.push({ text: match[6] || match[7], italic: true });
+      spans.push({ text: restoreEscapes(match[6] || match[7]), italic: true });
     } else if (match[8] !== undefined) {
       // strikethrough
-      spans.push({ text: match[8], strikethrough: true });
+      spans.push({ text: restoreEscapes(match[8]), strikethrough: true });
     } else if (match[9] !== undefined && match[10] !== undefined) {
-      // link
-      spans.push({ text: match[9], linkUrl: match[10] });
+      // markdown link [text](url)
+      spans.push({ text: restoreEscapes(match[9]), linkUrl: restoreEscapes(match[10].trim()) });
+    } else if (match[11] !== undefined && match[12] !== undefined) {
+      // html link <a href="url">text</a>
+      spans.push({ text: restoreEscapes(match[12]), linkUrl: restoreEscapes(match[11].trim()) });
+    } else if (match[13] !== undefined) {
+      // autolink <https://...>
+      spans.push({ text: restoreEscapes(match[13]), linkUrl: restoreEscapes(match[13].trim()) });
+    } else if (match[14] !== undefined) {
+      // bare url https://...
+      spans.push({ text: restoreEscapes(match[14]), linkUrl: restoreEscapes(match[14].trim()) });
     }
 
     lastIndex = regex.lastIndex;
   }
 
-  if (lastIndex < text.length) {
-    spans.push({ text: text.substring(lastIndex) });
+  if (lastIndex < processed.length) {
+    spans.push({ text: restoreEscapes(processed.substring(lastIndex)) });
   }
 
-  return spans.length > 0 ? spans : [{ text }];
+  return spans.length > 0 ? spans : [{ text: restoreEscapes(text) }];
 }
 
 /**
@@ -442,14 +523,25 @@ export async function convertMarkdownToPdf(
 
   // Layout state
   const pages: PDFPage[] = [];
+
+  const getPageTopY = (pageIndex: number) => {
+    // If running header is shown (page 2+), keep generous breathing room below header divider line (y: height - margin + 8)
+    if (showRunningHeader && pageIndex > 0) {
+      return height - margin - 22;
+    }
+    return height - margin - 12;
+  };
+
   let currentPage = pdfDoc.addPage([width, height]);
   pages.push(currentPage);
-  let currentY = height - margin;
+  let currentY = getPageTopY(0);
+  let isAtPageTop = true;
 
   const addNewPage = () => {
     currentPage = pdfDoc.addPage([width, height]);
     pages.push(currentPage);
-    currentY = height - margin;
+    currentY = getPageTopY(pages.length - 1);
+    isAtPageTop = true;
   };
 
   const ensureSpace = (needed: number) => {
@@ -489,7 +581,9 @@ export async function convertMarkdownToPdf(
       totalW = maxWidth + 1;
     }
 
-    if (totalW <= maxWidth) {
+    // If word fits within maxWidth or slightly within cell padding tolerance (<= maxWidth + 3.5),
+    // keep it intact to prevent orphaned dangling letters like "anonim" / "o"
+    if (totalW <= maxWidth + 3.5) {
       return [{ text: word, width: totalW }];
     }
 
@@ -519,7 +613,7 @@ export async function convertMarkdownToPdf(
         pWidth = maxWidth + 1;
       }
 
-      if (pWidth <= maxWidth) {
+      if (pWidth <= maxWidth + 3.5) {
         result.push({ text: part, width: pWidth });
       } else {
         // Force character-by-character break
@@ -536,6 +630,13 @@ export async function convertMarkdownToPdf(
           }
 
           if (curW + cW > maxWidth && cur.length > 0) {
+            // Guard against single-character orphan at the end (e.g. "o" in "anonimo")
+            const remainingChars = part.length - j;
+            if (remainingChars <= 1 && curW + cW <= maxWidth + 6) {
+              cur += c;
+              curW += cW;
+              continue;
+            }
             result.push({ text: cur, width: curW });
             cur = c;
             curW = cW;
@@ -565,6 +666,7 @@ export async function convertMarkdownToPdf(
     isCode?: boolean;
     isStrike?: boolean;
     isLink?: boolean;
+    linkUrl?: string;
     width: number;
   }
 
@@ -632,6 +734,7 @@ export async function convertMarkdownToPdf(
         isCode: item.span.code,
         isStrike: item.span.strikethrough,
         isLink: Boolean(item.span.linkUrl),
+        linkUrl: item.span.linkUrl,
         width: item.width,
       });
       currentLineWidth += item.width;
@@ -654,6 +757,7 @@ export async function convertMarkdownToPdf(
   const drawLines = (lines: RenderLine[], startX: number) => {
     lines.forEach((line) => {
       ensureSpace(line.height);
+      isAtPageTop = false;
       let curX = startX;
 
       line.fragments.forEach((frag) => {
@@ -688,14 +792,22 @@ export async function convertMarkdownToPdf(
           });
         }
 
-        if (frag.isLink) {
+        if (frag.isLink && frag.linkUrl) {
           // Underline for link
           currentPage.drawLine({
             start: { x: curX, y: currentY - 1 },
             end: { x: curX + frag.width, y: currentY - 1 },
-            thickness: 0.5,
+            thickness: 0.6,
             color: frag.color,
           });
+
+          // Official clickable PDF Link Annotation (/Annot /Link /URI)
+          addLinkAnnotationToPage(
+            pdfDoc,
+            currentPage,
+            [curX, currentY - 2, curX + frag.width, currentY + frag.size * 1.05],
+            frag.linkUrl
+          );
         }
 
         curX += frag.width;
@@ -707,6 +819,7 @@ export async function convertMarkdownToPdf(
 
   /**
    * Calculate proportional column widths based on cell content length
+   * Guarantees each column is wide enough to avoid breaking words like "anonimo"
    */
   const calculateTableColumnWidths = (
     headers: InlineSpan[][],
@@ -719,59 +832,80 @@ export async function convertMarkdownToPdf(
 
     const colMaxChars = new Array(colCount).fill(0);
     const colTotalChars = new Array(colCount).fill(0);
+    const colLongestWordChars = new Array(colCount).fill(0);
 
-    const getSpansLen = (spans?: InlineSpan[]) =>
-      (spans || []).reduce((sum, s) => sum + s.text.length, 0);
-
-    headers.forEach((h, c) => {
-      const len = getSpansLen(h);
+    const scanCell = (spans: InlineSpan[] | undefined, c: number) => {
+      if (!spans || spans.length === 0) return;
+      const fullText = spans.map((s) => s.text).join(' ');
+      const len = fullText.length;
       colMaxChars[c] = Math.max(colMaxChars[c], len);
       colTotalChars[c] += len;
-    });
 
+      const words = fullText.split(/\s+/).filter(Boolean);
+      for (const w of words) {
+        const pieces = w.split(/[\/\-_.:@?&=#\\]/).filter(Boolean);
+        if (pieces.length === 0) {
+          colLongestWordChars[c] = Math.max(colLongestWordChars[c], w.length);
+        } else {
+          for (const p of pieces) {
+            colLongestWordChars[c] = Math.max(colLongestWordChars[c], p.length);
+          }
+        }
+      }
+    };
+
+    headers.forEach((h, c) => scanCell(h, c));
     rows.forEach((row) => {
       row.forEach((cell, c) => {
         if (c < colCount) {
-          const len = getSpansLen(cell);
-          colMaxChars[c] = Math.max(colMaxChars[c], len);
-          colTotalChars[c] += len;
+          scanCell(cell, c);
         }
       });
     });
 
-    // Proportional weights: very short columns (1-3 chars) stay compact, longer columns get more room
-    const minColWidth = 38;
-    const colWeights = colMaxChars.map((maxLen, c) => {
-      const avgLen = rows.length > 0 ? colTotalChars[c] / (rows.length + 1) : maxLen;
-      if (maxLen <= 2) return 1.0;
-      if (maxLen <= 6) return 1.8;
-      if (maxLen <= 14) return 3.2;
-      if (maxLen <= 25) return 5.0;
-      return Math.min(16, 5.0 + Math.sqrt(avgLen) * 2.0);
-    });
-
-    const totalWeight = colWeights.reduce((a, b) => a + b, 0);
-    let widths = colWeights.map((w) =>
-      Math.max(minColWidth, Math.floor((w / totalWeight) * availWidth))
+    // Minimum width needed per column so that unbroken words (like "anonimo", "COD-04") fit without wrapping
+    // 5.8pt per char + 10pt cell padding + 4pt buffer
+    const colMinNeeded = colLongestWordChars.map((wLen) =>
+      Math.max(34, Math.ceil(wLen * 5.8 + 14))
     );
+    const sumMin = colMinNeeded.reduce((a, b) => a + b, 0);
 
-    let sum = widths.reduce((a, b) => a + b, 0);
-    while (sum > availWidth) {
-      let maxIdx = 0;
-      for (let i = 1; i < colCount; i++) {
-        if (widths[i] > widths[maxIdx]) maxIdx = i;
+    if (sumMin >= availWidth) {
+      // Extremely tight table: scale down proportionally
+      let widths = colMinNeeded.map((m) => Math.max(28, Math.floor((m / sumMin) * availWidth)));
+      let sum = widths.reduce((a, b) => a + b, 0);
+      while (sum > availWidth) {
+        let maxIdx = 0;
+        for (let i = 1; i < colCount; i++) {
+          if (widths[i] > widths[maxIdx]) maxIdx = i;
+        }
+        widths[maxIdx]--;
+        sum--;
       }
-      widths[maxIdx]--;
-      sum--;
+      return widths;
     }
 
-    const remainder = availWidth - sum;
-    if (remainder > 0) {
+    // Allocate guaranteed minimum widths to protect each column's words
+    let widths = [...colMinNeeded];
+    const remaining = availWidth - sumMin;
+
+    // Distribute remaining width proportionally to columns with more content
+    const weights = colTotalChars.map((tc, c) =>
+      Math.max(1, Math.sqrt(tc) * 2.2 + colMaxChars[c] * 0.3)
+    );
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+    const extra = weights.map((w) => Math.floor((w / totalWeight) * remaining));
+    widths = widths.map((w, c) => w + extra[c]);
+
+    let currentSum = widths.reduce((a, b) => a + b, 0);
+    const rem = Math.round(availWidth - currentSum);
+    if (rem !== 0) {
       let maxIdx = 0;
       for (let i = 1; i < colCount; i++) {
         if (widths[i] > widths[maxIdx]) maxIdx = i;
       }
-      widths[maxIdx] += remainder;
+      widths[maxIdx] += rem;
     }
 
     return widths;
@@ -789,18 +923,19 @@ export async function convertMarkdownToPdf(
       case 'header': {
         const sizes = [22, 17, 14, 12, 11, 10];
         const hSize = sizes[block.level - 1] || 12;
-        const topSpacing = block.level === 1 ? 26 : block.level === 2 ? 22 : 16;
-        const bottomSpacing = block.level <= 2 ? 14 : 8;
+        const topSpacing = isAtPageTop ? 6 : (block.level === 1 ? 26 : block.level === 2 ? 22 : 16);
+        const bottomSpacing = block.level <= 2 ? 20 : 10;
 
         ensureSpace(hSize + topSpacing + bottomSpacing + 25);
         currentY -= topSpacing;
+        isAtPageTop = false;
 
         const lines = wrapSpansToLines(block.spans, hSize, availableWidth, headerColor);
         drawLines(lines, margin);
 
         // Underline for H1 and H2 with comfortable padding
         if (block.level <= 2) {
-          currentY -= 4;
+          currentY -= 5;
           currentPage.drawLine({
             start: { x: margin, y: currentY },
             end: { x: margin + availableWidth, y: currentY },
@@ -815,13 +950,15 @@ export async function convertMarkdownToPdf(
       }
 
       case 'paragraph': {
+        isAtPageTop = false;
         const lines = wrapSpansToLines(block.spans, 10.5, availableWidth, textColor);
         drawLines(lines, margin);
-        currentY -= 8; // paragraph spacing
+        currentY -= 10; // paragraph spacing
         break;
       }
 
       case 'code_block': {
+        isAtPageTop = false;
         const codeLines = block.code.split('\n');
         const codeFontSize = 8.5;
         const codeLineHeight = codeFontSize * 1.4;
@@ -903,6 +1040,7 @@ export async function convertMarkdownToPdf(
       }
 
       case 'blockquote': {
+        isAtPageTop = false;
         let barColor = rgb(0.25, 0.45, 0.85); // default blue
         let bgTint = rgb(0.96, 0.97, 0.99);
 
@@ -952,6 +1090,7 @@ export async function convertMarkdownToPdf(
       }
 
       case 'list_item': {
+        isAtPageTop = false;
         const indentX = margin + block.level * 16;
         const contentX = indentX + 14;
         const contentWidth = availableWidth - (block.level * 16 + 14);
@@ -1007,11 +1146,13 @@ export async function convertMarkdownToPdf(
         const colCount = Math.max(block.headers.length, ...block.rows.map((r) => r.length));
         if (colCount === 0) break;
 
+        const tableTopSpacing = isAtPageTop ? 6 : 14;
         ensureSpace(50);
-        currentY -= 12; // Breathing room before table
+        currentY -= tableTopSpacing; // Breathing room before table
+        isAtPageTop = false;
 
         const colWidths = calculateTableColumnWidths(block.headers, block.rows, availableWidth);
-        const cellPadding = 6;
+        const cellPadding = 5;
         const cellFontSize = 9;
 
         // Calculate multi-line header height
@@ -1064,6 +1205,22 @@ export async function convertMarkdownToPdf(
                 font: fontBold,
                 color: headerColor,
               });
+
+              if (frag.isLink && frag.linkUrl) {
+                currentPage.drawLine({
+                  start: { x: curFragX, y: cellY - 1 },
+                  end: { x: curFragX + frag.width, y: cellY - 1 },
+                  thickness: 0.5,
+                  color: frag.color,
+                });
+                addLinkAnnotationToPage(
+                  pdfDoc,
+                  currentPage,
+                  [curFragX, cellY - 2, curFragX + frag.width, cellY + cellFontSize * 1.05],
+                  frag.linkUrl
+                );
+              }
+
               curFragX += frag.width;
             });
             cellY -= cellFontSize * 1.35;
@@ -1084,6 +1241,7 @@ export async function convertMarkdownToPdf(
           const rowHeight = maxLines * cellFontSize * 1.35 + cellPadding * 2;
 
           ensureSpace(rowHeight + 6);
+          isAtPageTop = false;
 
           // Alternating row background and outer border
           currentPage.drawRectangle({
@@ -1125,6 +1283,22 @@ export async function convertMarkdownToPdf(
                   font: frag.font,
                   color: frag.color,
                 });
+
+                if (frag.isLink && frag.linkUrl) {
+                  currentPage.drawLine({
+                    start: { x: curFragX, y: cellY - 1 },
+                    end: { x: curFragX + frag.width, y: cellY - 1 },
+                    thickness: 0.5,
+                    color: frag.color,
+                  });
+                  addLinkAnnotationToPage(
+                    pdfDoc,
+                    currentPage,
+                    [curFragX, cellY - 2, curFragX + frag.width, cellY + cellFontSize * 1.05],
+                    frag.linkUrl
+                  );
+                }
+
                 curFragX += frag.width;
               });
               cellY -= cellFontSize * 1.35;
@@ -1136,13 +1310,14 @@ export async function convertMarkdownToPdf(
           currentY -= rowHeight;
         });
 
-        // Generous spacing after table before next element
-        currentY -= 18;
+        // Generous spacing after table before next element (clear interlinea)
+        currentY -= 30;
         break;
       }
 
       case 'hr': {
         ensureSpace(32);
+        isAtPageTop = false;
         currentY -= 14;
         currentPage.drawLine({
           start: { x: margin, y: currentY },
